@@ -37,9 +37,34 @@ vec3 acceleration_and_GPE(object* restrict const inputArray,const unsigned int i
 
 // updates pos, vel, KE, and GPE of every object in inputArray
 void leapFrogStep( object* restrict const inputArray, const unsigned int inputArraySize, const unsigned int procRank, const unsigned int worldSize, const double epsilon, const double dt){
+    unsigned int ws;
+    unsigned int batchSize;
+    unsigned int startIndex;
+    if (worldSize > inputArraySize){ // edge case
+        if (procRank >= inputArraySize){
+            return;
+        }
+        ws = inputArraySize;
+    } else {
+        ws = worldSize;
+    }
+
+    if ((inputArraySize % worldSize != 0 )) {
+        if (procRank == worldSize - 1){
+            batchSize = worldSize % inputArraySize;
+            startIndex = inputArraySize - batchSize;
+        } else {
+            batchSize = inputArraySize / ws;
+            startIndex = batchSize * procRank;
+        }
+    } else {
+            batchSize = inputArraySize / ws;
+            startIndex = batchSize * procRank;
+    }
     // First Calculate which elements of acceleration we are going to work on
-    const unsigned int batchSize = inputArraySize / worldSize;
-    const unsigned int startIndex = batchSize * procRank;
+    
+   
+
     
     for (int i = startIndex; i < (startIndex + batchSize); i++){ // possible segfault if startIndex + batchSize > inputArraySize
         vec3 acc = acceleration_and_GPE(inputArray,inputArraySize,i,epsilon);
