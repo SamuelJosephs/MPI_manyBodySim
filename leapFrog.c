@@ -10,10 +10,11 @@
 
 #include <math.h>
 
-vec3 acceleration(const object* restrict const inputArray,const unsigned int inputArraySize, const unsigned int ithObject, const double epsilon){
+vec3 acceleration_and_GPE(object* restrict const inputArray,const unsigned int inputArraySize, const unsigned int ithObject, const double epsilon){
     vec3 outputAcc = vec3From(0.0,0.0,0.0);
     const vec3 iPos = inputArray[ithObject].pos;
-    
+    const double iMass = inputArray[ithObject].mass;
+    double GPE = 0;
     for (unsigned int j = 0; j < inputArraySize; j++){
         if (j == ithObject){
             continue;
@@ -25,21 +26,33 @@ vec3 acceleration(const object* restrict const inputArray,const unsigned int inp
         const double acc_mul = jMass * sqrt(pow(vec3_mag_squared(seperation) + epsilon*epsilon,3.0));
         const vec3 acc_mul_sep = scalar_mul_vec3(acc_mul,&seperation);
         outputAcc = add_vec3(&outputAcc,&acc_mul_sep);
+
+        const double ith_GPE = (iMass * jMass) / sqrt(vec3_mag_squared(seperation));
+        inputArray[ithObject].GPE += ith_GPE;
+
     }
 
     return outputAcc;
 }
 
-// updates posArray
+// updates pos, vel, KE, and GPE of every object in inputArray
 void leapFrogStep( object* restrict const inputArray, const unsigned int inputArraySize, const unsigned int procRank, const unsigned int worldSize, const double epsilon, const double dt){
     // First Calculate which elements of acceleration we are going to work on
     const unsigned int batchSize = inputArraySize / worldSize;
     const unsigned int startIndex = batchSize * procRank;
     
     for (int i = startIndex; i < (startIndex + batchSize); i++){ // possible segfault if startIndex + batchSize > inputArraySize
-        vec3 acc = acceleration(inputArray,inputArraySize,i,epsilon);
+        vec3 acc = acceleration_and_GPE(inputArray,inputArraySize,i,epsilon);
         const vec3 acc_dt = scalar_mul_vec3(dt,&acc);
+        const vec3 acc_half_dt = scalar_mul_vec3(0.5*dt,&acc);
+        const vec3 velSyncedToPos = add_vec3(&inputArray[i].vel,&acc_half_dt); // to calculate KE
         inputArray[i].vel = add_vec3(&inputArray[i].vel,&acc_dt);
+
+        inputArray[i].KE = 0.5 * inputArray[i].mass * vec3_mag_squared(velSyncedToPos);
+
+        // Now compute potential energy
+
+        
     }
     // Now update positions
 
