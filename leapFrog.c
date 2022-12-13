@@ -10,6 +10,11 @@
 
 #include <math.h>
 
+#ifndef MPI
+#define MPI
+#include <mpi.h>
+#endif
+
 vec3 acceleration_and_GPE(object* restrict const inputArray,const unsigned int inputArraySize, const unsigned int ithObject, const double epsilon){
     vec3 outputAcc = vec3From(0.0,0.0,0.0);
     const vec3 iPos = inputArray[ithObject].pos;
@@ -35,8 +40,36 @@ vec3 acceleration_and_GPE(object* restrict const inputArray,const unsigned int i
     return outputAcc;
 }
 
-// updates pos, vel, KE, and GPE of every object in inputArray
-void leapFrogStep( object* restrict const inputArray, const unsigned int inputArraySize, const unsigned int procRank, const unsigned int worldSize, const double epsilon, const double dt){
+// updates pos, vel, KE, and GPE of every object in inputArray, then calls AllGather to update each core with the results of the operation
+void leapFrogStep( object* restrict const inputArray, const unsigned int inputArraySize, const unsigned int procRank, const double epsilon, const double dt,const unsigned int batchSize,const unsigned int startIndex){
+    
+    for (int i = startIndex; i < (startIndex + batchSize); i++){ // possible segfault if startIndex + batchSize > inputArraySize
+        vec3 acc = acceleration_and_GPE(inputArray,inputArraySize,i,epsilon);
+        const vec3 acc_dt = scalar_mul_vec3(dt,&acc);
+        const vec3 acc_half_dt = scalar_mul_vec3(0.5*dt,&acc);
+        const vec3 velSyncedToPos = add_vec3(&inputArray[i].vel,&acc_half_dt); // to calculate KE
+        inputArray[i].vel = add_vec3(&inputArray[i].vel,&acc_dt);
+
+        inputArray[i].KE = 0.5 * inputArray[i].mass * vec3_mag_squared(velSyncedToPos);
+        // GPE calculated in acceleration function
+       
+
+        
+    }
+    // Now update positions
+
+    for (int i = startIndex; i < (startIndex + batchSize); i++){
+        const vec3 v_dt = scalar_mul_vec3(dt,&inputArray[i].vel);
+        inputArray[i].pos = add_vec3(&inputArray[i].pos,&v_dt);
+    }
+
+    // MPI_Allgather(inputArray + startIndex,batchSize * sizeof(object),MPI_CHAR,inputArray,inputArraySize * sizeof(object),MPI_CHAR,MPI_COMM_WORLD);
+
+}
+
+
+// updates vel by half a time step
+void leapFrogSetup( object* restrict const inputArray, const unsigned int inputArraySize, const unsigned int procRank, const unsigned int worldSize, const double epsilon, const double dt){
     unsigned int ws;
     unsigned int batchSize;
     unsigned int startIndex;
@@ -68,22 +101,19 @@ void leapFrogStep( object* restrict const inputArray, const unsigned int inputAr
     
     for (int i = startIndex; i < (startIndex + batchSize); i++){ // possible segfault if startIndex + batchSize > inputArraySize
         vec3 acc = acceleration_and_GPE(inputArray,inputArraySize,i,epsilon);
-        const vec3 acc_dt = scalar_mul_vec3(dt,&acc);
-        const vec3 acc_half_dt = scalar_mul_vec3(0.5*dt,&acc);
-        const vec3 velSyncedToPos = add_vec3(&inputArray[i].vel,&acc_half_dt); // to calculate KE
+        const vec3 acc_dt = scalar_mul_vec3(0.5*dt,&acc);
+     
+        // to calculate KE
         inputArray[i].vel = add_vec3(&inputArray[i].vel,&acc_dt);
 
-        inputArray[i].KE = 0.5 * inputArray[i].mass * vec3_mag_squared(velSyncedToPos);
+        inputArray[i].KE = 0.5 * inputArray[i].mass * vec3_mag_squared(inputArray[i].vel);
 
-        // Now compute potential energy
+        
 
         
     }
-    // Now update positions
 
-    for (int i = startIndex; i < (startIndex + batchSize); i++){
-        const vec3 v_dt = scalar_mul_vec3(dt,&inputArray[i].vel);
-        inputArray[i].pos = add_vec3(&inputArray[i].pos,&v_dt);
-    }
 
 }
+
+
