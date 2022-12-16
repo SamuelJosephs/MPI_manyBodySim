@@ -15,7 +15,8 @@
 #include <mpi.h>
 #endif
 
-vec3 acceleration_and_GPE(object* restrict const inputArray,const unsigned int inputArraySize, const unsigned int ithObject, const double epsilon){
+vec3 acceleration_and_GPE(object* const inputArray,const unsigned int inputArraySize, const unsigned int ithObject, const double epsilon){
+    const double g = 6.67e-11;
     vec3 outputAcc = vec3From(0.0,0.0,0.0);
     const vec3 iPos = inputArray[ithObject].pos;
     const double iMass = inputArray[ithObject].mass;
@@ -28,7 +29,7 @@ vec3 acceleration_and_GPE(object* restrict const inputArray,const unsigned int i
         const double jMass = inputArray[j].mass;
 
         const vec3 seperation = sub_vec3(&jPos,&iPos); // Should be the other way round but more computationally efficient to encode the minus sign here
-        const double acc_mul = jMass * sqrt(pow(vec3_mag_squared(seperation) + epsilon*epsilon,3.0));
+        const double acc_mul = (g * jMass) / sqrt(pow(vec3_mag_squared(seperation) + epsilon*epsilon,3.0));
         const vec3 acc_mul_sep = scalar_mul_vec3(acc_mul,&seperation);
         outputAcc = add_vec3(&outputAcc,&acc_mul_sep);
 
@@ -41,7 +42,7 @@ vec3 acceleration_and_GPE(object* restrict const inputArray,const unsigned int i
 }
 
 // updates pos, vel, KE, and GPE of every object in inputArray, then calls AllGather to update each core with the results of the operation
-void leapFrogStep( object* restrict const inputArray, const unsigned int inputArraySize, const unsigned int procRank, const double epsilon, const double dt,const unsigned int batchSize,const unsigned int startIndex){
+void leapFrogStep( object* const restrict inputArray, const unsigned int inputArraySize, const double epsilon, const double dt,const unsigned int batchSize,const unsigned int startIndex){
     
     for (int i = startIndex; i < (startIndex + batchSize); i++){ // possible segfault if startIndex + batchSize > inputArraySize
         vec3 acc = acceleration_and_GPE(inputArray,inputArraySize,i,epsilon);
@@ -63,56 +64,53 @@ void leapFrogStep( object* restrict const inputArray, const unsigned int inputAr
         inputArray[i].pos = add_vec3(&inputArray[i].pos,&v_dt);
     }
 
-    // MPI_Allgather(inputArray + startIndex,batchSize * sizeof(object),MPI_CHAR,inputArray,inputArraySize * sizeof(object),MPI_CHAR,MPI_COMM_WORLD);
+    
 
 }
 
 
 // updates vel by half a time step
-void leapFrogSetup( object* restrict const inputArray, const unsigned int inputArraySize, const unsigned int procRank, const unsigned int worldSize, const double epsilon, const double dt){
-    unsigned int ws;
-    unsigned int batchSize;
-    unsigned int startIndex;
-    if (worldSize > inputArraySize){ // edge case
-        if (procRank >= inputArraySize){
-            return;
-        }
-        ws = inputArraySize;
-    } else {
-        ws = worldSize;
-    }
-
-    if ((inputArraySize % worldSize != 0 )) {
-        if (procRank == worldSize - 1){
-            batchSize = worldSize % inputArraySize;
-            startIndex = inputArraySize - batchSize;
-        } else {
-            batchSize = inputArraySize / ws;
-            startIndex = batchSize * procRank;
-        }
-    } else {
-            batchSize = inputArraySize / ws;
-            startIndex = batchSize * procRank;
-    }
-    // First Calculate which elements of acceleration we are going to work on
+void leapFrogSetup( object* const restrict inputArray, const unsigned int inputArraySize, const double epsilon, const double dt){
     
-   
-
-    
-    for (int i = startIndex; i < (startIndex + batchSize); i++){ // possible segfault if startIndex + batchSize > inputArraySize
+    for (int i = 0; i < inputArraySize; i++){ // possible segfault if startIndex + batchSize > inputArraySize
         vec3 acc = acceleration_and_GPE(inputArray,inputArraySize,i,epsilon);
-        const vec3 acc_dt = scalar_mul_vec3(0.5*dt,&acc);
-     
-        // to calculate KE
+        const vec3 acc_dt = scalar_mul_vec3(-0.5*dt,&acc);
+        
+        
         inputArray[i].vel = add_vec3(&inputArray[i].vel,&acc_dt);
 
         inputArray[i].KE = 0.5 * inputArray[i].mass * vec3_mag_squared(inputArray[i].vel);
-
-        
+        // GPE calculated in acceleration function
+       
 
         
     }
 
+}
+
+
+void writeOutputToFile(FILE* file, const object* const restrict BUFFER, const unsigned int BUFF_LEN){
+    // Calculate the total kinetic and potential energies,
+    double KE, GPE;
+        
+    for (int i = 0; i < BUFF_LEN; i++){
+        fprintf(file,"%f,%f,%f,%f,%f,%f,%f,%f,%f,",
+                BUFFER[i].mass,
+                BUFFER[i].pos.x,
+                BUFFER[i].pos.y,
+                BUFFER[i].pos.z,
+                BUFFER[i].vel.x,
+                BUFFER[i].vel.y,
+                BUFFER[i].vel.z,
+                BUFFER[i].KE,
+                BUFFER[i].GPE);
+        KE += BUFFER[i].KE;
+        GPE += BUFFER[i].GPE;
+        
+
+    }
+    fprintf(file,"%f,%f,%f",KE,GPE,KE + GPE);
+    fputc('\n',file);
 
 }
 
