@@ -22,7 +22,7 @@
 #define G 6.67e-11
 #define V_RAD(R) sqrt((G*MASS_SUN)/R)
 
-const double T = (365.25*24.*60.*60.);
+const double T = 100*(365.25*24.*60.*60.);
 const double dt = (24.*60.*60.);
 const double nsteps = T/dt;
 const double epsilon = 1e-4;

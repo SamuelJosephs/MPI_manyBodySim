@@ -21,6 +21,7 @@ vec3 acceleration_and_GPE(object* const inputArray,const unsigned int inputArray
     const vec3 iPos = inputArray[ithObject].pos;
     const double iMass = inputArray[ithObject].mass;
     double GPE = 0;
+    inputArray[ithObject].GPE = 0.; // Prevent build up of energy in system.
     for (unsigned int j = 0; j < inputArraySize; j++){
         if (j == ithObject){
             continue;
@@ -91,7 +92,8 @@ void leapFrogSetup( object* const restrict inputArray, const unsigned int inputA
 
 void writeOutputToFile(FILE* file, const object* const restrict BUFFER, const unsigned int BUFF_LEN){
     // Calculate the total kinetic and potential energies,
-    double KE, GPE;
+    double KE = 0.;
+    double GPE = 0.;
         
     for (int i = 0; i < BUFF_LEN; i++){
         fprintf(file,"%f,%f,%f,%f,%f,%f,%f,%f,%f,",
