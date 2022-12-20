@@ -2,11 +2,22 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 db = pd.read_csv("output.csv").to_numpy(np.double)
-arr = []
+
+arrTotalE = []
+arrTotalGPE = []
+arrTotalKE = []
+
 
 for i in db:
-    arr.append(i[-1])
-energy_difference = ((arr[-1] - arr[0])/arr[0]) * 100
+    arrTotalE.append(i[-1])
+    arrTotalGPE.append(i[-2])
+    arrTotalKE.append(i[-3])
+arrTotalE = [i for i in map(lambda x: 100*(arrTotalE[0] - x)/arrTotalE[0],arrTotalE)] # This is dumb but I had already gone through the trouble of using map.
+
+energy_difference = abs(((arrTotalE[-1] - arrTotalE[0])/arrTotalE[0])) * 100
 print(f"Energy Difference = {energy_difference}%")
-plt.plot(arr)
+plt.plot(arrTotalE)
+plt.xlabel("iteration(s)")
+plt.ylabel("Energy difference (%)")
+plt.savefig("TotalE.pdf",bbox_inches = "tight")
 plt.show()
