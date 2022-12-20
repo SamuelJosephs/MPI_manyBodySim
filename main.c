@@ -41,26 +41,6 @@ int main(int argc, char** argv) {
 	MPI_Comm_rank(MPI_COMM_WORLD,&proc_rank);
 
 	// Set up system
-	vec3 earthPos = vec3From(RAD_EARTH,0.0,0.0);
-	vec3 earthVel = vec3From(0.0,V_RAD(RAD_EARTH),0.0);
-	vec3 earthAcc = vec3From(0.0,0.0,0.0);
-	object earth = obFrom(earthPos,earthVel,earthAcc,MASS_Earth,0.0,0.0);
-
-	vec3 jupiterPos = vec3From(-RAD_JUPITER,0.0,0.0);
-	vec3 jupiterVel = vec3From(0.0,-V_RAD(RAD_JUPITER),0.0);
-	vec3 jupiterAcc = vec3From(0.0,0.0,0.0);
-	object jupiter = obFrom(jupiterPos,jupiterVel,jupiterAcc,MASS_JUPITER,0.0,0.0);
-
-	vec3 sunPos = vec3From(0.0,0.0,0.0);
-	vec3 sunVel = vec3From(0.0,0.0,0.0);
-	vec3 sunAcc = vec3From(0.0,0.0,0.0);
-	object sun = obFrom(sunPos,sunVel,sunAcc,MASS_SUN,0.0,0.0);
-
-	
-	// inputArray =  malloc(NUM_OBJECTS * sizeof(object));
-	// leapFrogSetup(inputArray,NUM_OBJECTS,epsilon,dt);
-	// inputArray[0] = earth; inputArray[1] = sun; inputArray[2] = jupiter;
-	// Core 0 will need to print the outputs to a file;
 	object *inputArray = EarthSunJupiter(&NUM_OBJECTS,epsilon,dt);
 	leapFrogSetup(inputArray,NUM_OBJECTS,epsilon,dt);
 	FILE* file;
