@@ -11,16 +11,8 @@
 #include "leapFrog.c"
 #endif
 
+#include "systems.c"
 
-#define NUM_OBJECTS 3
-#define MASS_Earth 5.9722e24
-#define MASS_SUN 1.989e30
-#define MASS_JUPITER 1.898e27
-
-#define RAD_EARTH 1.4959787e11
-#define RAD_JUPITER 778e9
-#define G 6.67e-11
-#define V_RAD(R) sqrt((G*MASS_SUN)/R)
 
 const double T = 100*(365.25*24.*60.*60.);
 const double dt = (24.*60.*60.);
@@ -43,6 +35,7 @@ int main(int argc, char** argv) {
 
 	int num_procs;
 	int proc_rank;
+	int NUM_OBJECTS;
 
 	MPI_Comm_size(MPI_COMM_WORLD,&num_procs);
 	MPI_Comm_rank(MPI_COMM_WORLD,&proc_rank);
@@ -63,15 +56,19 @@ int main(int argc, char** argv) {
 	vec3 sunAcc = vec3From(0.0,0.0,0.0);
 	object sun = obFrom(sunPos,sunVel,sunAcc,MASS_SUN,0.0,0.0);
 
-	object inputArray[NUM_OBJECTS] = {earth,sun,jupiter};
-	leapFrogSetup(inputArray,NUM_OBJECTS,epsilon,dt);
+	
+	// inputArray =  malloc(NUM_OBJECTS * sizeof(object));
+	// leapFrogSetup(inputArray,NUM_OBJECTS,epsilon,dt);
+	// inputArray[0] = earth; inputArray[1] = sun; inputArray[2] = jupiter;
 	// Core 0 will need to print the outputs to a file;
+	object *inputArray = EarthSunJupiter(&NUM_OBJECTS,epsilon,dt);
+	leapFrogSetup(inputArray,NUM_OBJECTS,epsilon,dt);
 	FILE* file;
 	if (proc_rank == 0){
 		file = fopen("output.csv","w+");
 	}
 	if (proc_rank == 0){
-		writeOutputToFile(file,inputArray,NUM_OBJECTS);
+		writeOutputToFile(file,inputArray,3);
 	}
 	// deal with the edge case where num_procs > NUM_OBJECTS, use adjusted comm for all further MPI calls.
 	MPI_Comm adjustedComm;
@@ -163,7 +160,7 @@ int main(int argc, char** argv) {
 	
 
 	
-	free(countsRecv); free(displs);
+	free(countsRecv); free(displs); free(inputArray);
 	
 	MPI_Finalize();
 	return 0;
