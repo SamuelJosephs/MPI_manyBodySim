@@ -42,6 +42,7 @@ int main(int argc, char** argv) {
 
 	// Set up system
 	object *inputArray = EarthSunJupiter(&NUM_OBJECTS,epsilon,dt);
+	object* inputArrayTemp = malloc(NUM_OBJECTS * sizeof(object));
 	leapFrogSetup(inputArray,NUM_OBJECTS,epsilon,dt);
 	FILE* file;
 	if (proc_rank == 0){
@@ -55,7 +56,7 @@ int main(int argc, char** argv) {
 	MPI_Group worldGroup;
 	MPI_Group adjustedGroup;
 	
-	
+	printf("There are %d procs\n",num_procs);
 	if (num_procs > NUM_OBJECTS){
 		
 		// Calculate ranks in worldGroup to exclude from adjustedGroup
@@ -89,13 +90,14 @@ int main(int argc, char** argv) {
 		}
 
 	} else {
-		MPI_Comm_dup(MPI_COMM_WORLD,&adjustedComm); // If none of this is applicable then set adjustedComm = M{I_COMM_WORLD
+		MPI_Comm_dup(MPI_COMM_WORLD,&adjustedComm); // If none of this is applicable then set adjustedComm = MPI_COMM_WORLD
 	}
 
 
 	unsigned int batchsize = NUM_OBJECTS / num_procs;
 	const unsigned int usualBatchSize = batchsize; // Used for calculating displacements
 	unsigned int startIndex = batchsize * proc_rank;
+	
 	// If NUM_OBJECTS cannot be divided up nicely between cores then let the final core have the remainder
 	// The possiblity of num_cores > NUM_OBJECTS was eliminated above
 	if ((NUM_OBJECTS % num_procs != 0) && (proc_rank == num_procs - 1)){
@@ -110,22 +112,24 @@ int main(int argc, char** argv) {
 	// Compute the number of counts recieved from each processor and where they should go;
 	for (int i = 0; i < num_procs; i++){
 		if (i == num_procs - 1){
-			countsRecv[i] = batchsize;
-			displs[i] =  ((NUM_OBJECTS-1) - batchsize)*sizeof(object); // Get the displacement in bytes
+			countsRecv[i] = batchsize*sizeof(object);
+			displs[i] =  usualBatchSize*i*sizeof(object); // Get the displacement in bytes
 			continue;
 		}
-		countsRecv[i] = NUM_OBJECTS / num_procs;
+		countsRecv[i] = usualBatchSize*sizeof(object);
 		displs[i] = usualBatchSize * i * sizeof(object); // Get the displacement in bytes
 	}
 
 
 		
 	
-
+	printf("StartIndex from proc_rank %d is %d with batchSize %d\n ",proc_rank,startIndex,batchsize);
 	for (int i = 0; i < nsteps; i++){
+		// leapFrogStep(inputArray,NUM_OBJECTS,epsilon,dt,batchsize,startIndex);
 		leapFrogStep(inputArray,NUM_OBJECTS,epsilon,dt,batchsize,startIndex);
+		
 		// TODO: MPI_AllGatherv
-		MPI_Allgatherv(inputArray + (proc_rank*usualBatchSize*sizeof(object)),batchsize,MPI_CHAR,inputArray,countsRecv,displs,MPI_CHAR,adjustedComm);
+		MPI_Allgatherv(inputArray + startIndex,batchsize*sizeof(object),MPI_CHAR,inputArray,countsRecv,displs,MPI_CHAR,adjustedComm);
 	
 
 
