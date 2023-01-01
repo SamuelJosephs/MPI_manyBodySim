@@ -14,10 +14,10 @@
 #include "systems.c"
 
 
-const double T = 100*(365.25*24.*60.*60.);
+const double T = 10*(365.25*24.*60.*60.);
 const double dt = (24.*60.*60.);
 const double nsteps = T/dt;
-const double epsilon = 1e-4;
+const double epsilon = 1e-1;
 
 // Program goes as follows
 // Each Core starts with an array of Earth, Sun, and Jupiter.
@@ -41,15 +41,16 @@ int main(int argc, char** argv) {
 	MPI_Comm_rank(MPI_COMM_WORLD,&proc_rank);
 
 	// Set up system
-	object *inputArray = EarthSunJupiter(&NUM_OBJECTS,epsilon,dt);
-	object* inputArrayTemp = malloc(NUM_OBJECTS * sizeof(object));
+	// object *inputArray = EarthSunJupiter(&NUM_OBJECTS,epsilon,dt);
+	object* inputArray = sphericalDistribution(&NUM_OBJECTS,epsilon,dt);
+	
 	leapFrogSetup(inputArray,NUM_OBJECTS,epsilon,dt);
 	FILE* file;
 	if (proc_rank == 0){
 		file = fopen("output.csv","w+");
 	}
 	if (proc_rank == 0){
-		writeOutputToFile(file,inputArray,3);
+		writeOutputToFile(file,inputArray,NUM_OBJECTS);
 	}
 	// deal with the edge case where num_procs > NUM_OBJECTS, use adjusted comm for all further MPI calls.
 	MPI_Comm adjustedComm;
