@@ -17,7 +17,7 @@
 const double T = 4000*(365.25*24.*60.*60.);
 const double dt = 10*(24.*60.*60.);
 const double nsteps = T/dt;
-const double epsilon = 1e2;
+const double epsilon = 1e3;
 
 // Program goes as follows
 // Each Core starts with an array of Earth, Sun, and Jupiter.
@@ -134,7 +134,10 @@ int main(int argc, char** argv) {
 		// TODO: MPI_AllGatherv
 		MPI_Allgatherv(inputArray + startIndex,batchsize*sizeof(object),MPI_CHAR,inputArray,countsRecv,displs,MPI_CHAR,adjustedComm);
 		// Each core copy batchsize objects to outputArray + n + startIndex
-		memcpy(outputArray + n + startIndex, inputArray,batchsize * sizeof(object));
+
+		// memcpy(outputArray + n + startIndex, inputArray,batchsize * sizeof(object));
+		// Write contents to outputArray.
+		MPI_Allgatherv(inputArray + startIndex,batchsize*sizeof(object),MPI_CHAR,outputArray + n,countsRecv,displs,MPI_CHAR,adjustedComm);
 		n += NUM_OBJECTS;
 
 		//TODO: Impliment dynamic formatable strings
@@ -153,7 +156,7 @@ int main(int argc, char** argv) {
 	
 
 	
-	free(countsRecv); free(displs); free(inputArray);
+	free(countsRecv); free(displs); free(inputArray); free(outputArray);
 	
 	MPI_Finalize();
 	return 0;
