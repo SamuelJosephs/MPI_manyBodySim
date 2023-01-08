@@ -5,7 +5,7 @@ with import <nixpkgs> {};
         src = ./.;
 
         buildPhase = ''
-            mpicc main.c -O3 -lm -o simulation  
+            mpicc main.c -Ofast -lm -ffast-math -march=native -o simulation  
 
         '';
 
