@@ -14,10 +14,10 @@
 #include "systems.c"
 
 
-const double T = 10*(365.25*24.*60.*60.);
-const double dt = (24.*60.*60.);
+const double T = 4000*(365.25*24.*60.*60.);
+const double dt = 10*(24.*60.*60.);
 const double nsteps = T/dt;
-const double epsilon = 1e-1;
+const double epsilon = 1e2;
 
 // Program goes as follows
 // Each Core starts with an array of Earth, Sun, and Jupiter.
@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
 	// Set up system
 	// object *inputArray = EarthSunJupiter(&NUM_OBJECTS,epsilon,dt);
 	object* inputArray = sphericalDistribution(&NUM_OBJECTS,epsilon,dt);
-	
+	object* outputArray = malloc(NUM_OBJECTS * nsteps * sizeof(object));
 	leapFrogSetup(inputArray,NUM_OBJECTS,epsilon,dt);
 	FILE* file;
 	if (proc_rank == 0){
@@ -125,20 +125,28 @@ int main(int argc, char** argv) {
 		
 	
 	printf("StartIndex from proc_rank %d is %d with batchSize %d\n ",proc_rank,startIndex,batchsize);
+	int n = 0;
+	int counter = 0;
 	for (int i = 0; i < nsteps; i++){
 		// leapFrogStep(inputArray,NUM_OBJECTS,epsilon,dt,batchsize,startIndex);
 		leapFrogStep(inputArray,NUM_OBJECTS,epsilon,dt,batchsize,startIndex);
 		
 		// TODO: MPI_AllGatherv
 		MPI_Allgatherv(inputArray + startIndex,batchsize*sizeof(object),MPI_CHAR,inputArray,countsRecv,displs,MPI_CHAR,adjustedComm);
-	
+		// Each core copy batchsize objects to outputArray + n + startIndex
+		memcpy(outputArray + n + startIndex, inputArray,batchsize * sizeof(object));
+		n += NUM_OBJECTS;
+
+		//TODO: Impliment dynamic formatable strings
 
 
+
+
+	}
 
 
 		if (proc_rank == 0)
-			writeOutputToFile(file,inputArray,NUM_OBJECTS);
-	}
+			writeOutputArrayToFile(outputArray,file,NUM_OBJECTS,nsteps);
 
 	if (proc_rank == 0)
 		fclose(file);
