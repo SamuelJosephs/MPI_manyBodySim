@@ -94,7 +94,7 @@ void writeOutputToFile(FILE* file, const object* const restrict BUFFER, const un
     // Calculate the total kinetic and potential energies,
     double KE = 0.;
     double GPE = 0.;
-        
+    
     for (int i = 0; i < BUFF_LEN; i++){
         fprintf(file,"%f,%f,%f,%f,%f,%f,%f,%f,%f,",
                 BUFFER[i].mass,
@@ -108,12 +108,21 @@ void writeOutputToFile(FILE* file, const object* const restrict BUFFER, const un
                 BUFFER[i].GPE);
         KE += BUFFER[i].KE;
         GPE += BUFFER[i].GPE;
+        fflush(file);
         
 
     }
     fprintf(file,"%f,%f,%f",KE,GPE,KE + GPE);
     fputc('\n',file);
 
+}
+
+void writeOutputArrayToFile(const object* const restrict outputArray, FILE* file, const int NUM_OBJECTS, const int nsteps){
+    int n = 0;
+    for (int step = 0; step < nsteps; step++){
+        writeOutputToFile(file,outputArray + n,NUM_OBJECTS);
+        n += NUM_OBJECTS;
+    }
 }
 
 
