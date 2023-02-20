@@ -1,6 +1,9 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+
+radJupiter = 778e9
+
 db = pd.read_csv("output.csv",dtype = float).to_numpy(np.double)
 
 arrTotalE = []
@@ -46,7 +49,10 @@ for n in range(len(xPositions)):
     ax.plot3D(xPositions[n],yPositions[n],zPositions[n])
     # ax.plot3D(xPositions[1],yPositions[1],zPositions[1])
     # ax.plot3D(xPositions[2],yPositions[2],zPositions[2])
-
+a = 10
+ax.set_xlim(-a*radJupiter,a*radJupiter)
+ax.set_ylim(-a*radJupiter,a*radJupiter)
+ax.set_zlim(-a*radJupiter,a*radJupiter)
 plt.show()
 
 print(xPositions[1])

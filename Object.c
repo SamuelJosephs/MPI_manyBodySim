@@ -11,6 +11,7 @@ typedef struct {
     double mass;
     double KE;
     double GPE;
+    int next; // next object in head, -1 means you are at the ned of the list
 } object;
 
 object obFrom(vec3 pos, vec3 vel, vec3 acc, double mass, double KE, double GPE){
@@ -21,5 +22,6 @@ object obFrom(vec3 pos, vec3 vel, vec3 acc, double mass, double KE, double GPE){
     output.mass = mass;
     output.KE = KE;
     output.GPE = GPE;
+    output.next = 0;
     return output;
 }

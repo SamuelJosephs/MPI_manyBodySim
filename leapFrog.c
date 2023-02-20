@@ -63,6 +63,7 @@ void leapFrogStep( object* const restrict inputArray, const unsigned int inputAr
     for (int i = startIndex; i < (startIndex + batchSize); i++){
         const vec3 v_dt = scalar_mul_vec3(dt,&inputArray[i].vel);
         inputArray[i].pos = add_vec3(&inputArray[i].pos,&v_dt);
+        
     }
 
     

@@ -46,3 +46,28 @@ object* EarthSunJupiter(int* NUM_OBJECTS,double epsilon, double dt){
     return ARRAY;
 	
 }
+
+object* sphericalDistribution(int* NUM_OBJECTS,double epsilon, double dt){
+	*NUM_OBJECTS = 100;
+	srand(1);
+	int count = 0;
+	object* outArray = malloc(*NUM_OBJECTS * sizeof(object));
+	const double a = 10 * RAD_JUPITER;
+	while (count < *NUM_OBJECTS) {
+		double xrand = (((float) rand())/(float) RAND_MAX) * a;
+		double yrand = (((float) rand())/(float) RAND_MAX) * a;
+		double zrand = (((float) rand())/(float) RAND_MAX) * a;
+
+		if (xrand*xrand + yrand*yrand + zrand*zrand > a*a)
+			continue;
+		
+		vec3 position = vec3From(xrand,yrand,zrand);
+		vec3 vel = vec3From(0.,0.,0.);
+		vec3 acc = vec3From(0.,0.,0.);
+		double mass = MASS_Earth;
+		outArray[count] = obFrom(position,vel,acc,mass,0.,0.);
+		count++;
+	}
+	printf("Count = %d\n",count);
+	return outArray;
+}
