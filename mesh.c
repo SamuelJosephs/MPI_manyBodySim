@@ -109,7 +109,7 @@ void shortRangeForces(mesh* inputMesh){
    }
 }
 
-vec3 accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned int j,const unsigned int k ){
+void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned int j,const unsigned int k ){
     meshCell* cell = &inputMesh->meshCells[i][j][k];
     int neighbhors[27]; // max neighbhors = 27 = 3**3 
     neighbhors[26] = cell->head;
@@ -129,6 +129,7 @@ vec3 accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned i
                 accelForIthObject = add_vec3(&accelForIthObject,&acc); 
             }
         }
+        inputMesh->objects[i].acc = accelForIthObject;
         
     }
 }
