@@ -25,6 +25,7 @@ typedef struct mesh {
     double universeWidth;
     object* objects;
     unsigned int numObjects;
+    double epsilon;
 } mesh;
 
 void assignObjectsToMesh(object* objects,const unsigned int numObjects, mesh* inputMesh){
@@ -48,7 +49,7 @@ void assignObjectsToMesh(object* objects,const unsigned int numObjects, mesh* in
     }
 }
 
-mesh meshFrom(const double meshCellWidth, const double universeWidth, object* objects, int numObjects){
+mesh meshFrom(const double meshCellWidth, const double universeWidth, object* objects, int numObjects,double epsilon){
     mesh output;
     output.objects = objects;
     output.numObjects = numObjects;
@@ -56,6 +57,7 @@ mesh meshFrom(const double meshCellWidth, const double universeWidth, object* ob
     output.numMeshCellsPerSideLength = (unsigned int) (universeWidth / meshCellWidth);
     output.numMeshCells = output.numMeshCellsPerSideLength * output.numMeshCellsPerSideLength * output.numMeshCellsPerSideLength; // cube it 
     output.cellWidth = meshCellWidth;
+    output.epsilon = epsilon;
     // Create array of meshcells
     output.meshCells = malloc(output.numMeshCells * sizeof(meshCell));
     if (output.meshCells == NULL){
@@ -102,7 +104,7 @@ void shortRangeForces(mesh* inputMesh){
    for (int i = 0; i < maxCount; i++){
         for (int j = 0; j < maxCount; j++){
             for (int k = 0; k < maxCount; k++){
-                accelerationFromCell(inputMesh,i,j,k);
+                accelerationFromCell(inputMesh,i,j,k); // Does 2 and 3 lol
 
             }
         }
@@ -159,6 +161,7 @@ void getAdjacentCells(int* neighbhorArray, mesh* inputMesh, int i, int j, int k)
 
 vec3 accelerationBetweenObjects(mesh* inputMesh, int A, int B){
     const double g = 6.67e-11;
+    const double epsilon = inputMesh->epsilon;
     vec3 outputAcc = inputMesh->objects[A].acc;
     const vec3 iPos = inputMesh->objects[A].pos;
     const double iMass = inputMesh->objects[A].mass;
