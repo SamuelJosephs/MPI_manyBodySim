@@ -1,3 +1,5 @@
+#include <math.h>
+
 #ifndef SIMPLE_VEC
 #define SIMPLE_VEC
 #include "simpleVec.c"
@@ -20,13 +22,21 @@ typedef struct meshCell {
 typedef struct mesh {
     unsigned int numMeshCells;
     unsigned int numMeshCellsPerSideLength;
-    meshCell*** meshCells;
+    meshCell* meshCells;
     double cellWidth;
     double universeWidth;
     object* objects;
     unsigned int numObjects;
     double epsilon;
 } mesh;
+
+meshCell* indexMesh(const mesh* inputMesh, int i, int j, int k){
+    const int N = inputMesh->numMeshCellsPerSideLength;
+    return &(inputMesh->meshCells[((k * N*N) + (j*N) + i)]) ;
+}
+
+
+
 
 void assignObjectsToMesh(object* objects,const unsigned int numObjects, mesh* inputMesh){
     for (int i = 0; i < numObjects; i++){
@@ -38,7 +48,7 @@ void assignObjectsToMesh(object* objects,const unsigned int numObjects, mesh* in
         int yIndex = fracY * inputMesh -> numMeshCellsPerSideLength;
         int zIndex = fracZ * inputMesh -> numMeshCellsPerSideLength;
 
-        meshCell* cell =  &(inputMesh -> meshCells[xIndex][yIndex][zIndex]);
+        meshCell* cell =  indexMesh(inputMesh,xIndex,yIndex,zIndex);
         if (cell -> head == -1){
             objects[i].next = -1; // appending to linked list
             cell -> head = i;
@@ -55,9 +65,11 @@ mesh meshFrom(const double meshCellWidth, const double universeWidth, object* ob
     output.numObjects = numObjects;
     output.universeWidth = universeWidth;
     output.numMeshCellsPerSideLength = (unsigned int) (universeWidth / meshCellWidth);
+    printf("There are %d meshCells per side length\n",output.numMeshCellsPerSideLength);
     output.numMeshCells = output.numMeshCellsPerSideLength * output.numMeshCellsPerSideLength * output.numMeshCellsPerSideLength; // cube it 
     output.cellWidth = meshCellWidth;
     output.epsilon = epsilon;
+    printf("Num mesh cells per side length = %d\n",output.numMeshCellsPerSideLength);
     // Create array of meshcells
     output.meshCells = malloc(output.numMeshCells * sizeof(meshCell));
     if (output.meshCells == NULL){
@@ -67,10 +79,11 @@ mesh meshFrom(const double meshCellWidth, const double universeWidth, object* ob
     meshCell temp;
     for (int i = 0; i < output.numMeshCells; i++){ // initialise next pointers to each meshcell to be -1 (empty)
         
-        ((meshCell*)output.meshCells)[i] = temp; // Maybe undefined behaviour. Initialise heads to be empty (-1).
-        ((meshCell*)output.meshCells)[i].head = -1;
+        output.meshCells[i] = temp; // Maybe undefined behaviour. Initialise heads to be empty (-1).
+        output.meshCells[i].head = -1;
         
     }
+    printf("Got Past Initialisation of meshcells\n");
 
     for (int i = 0; i < output.numMeshCellsPerSideLength; i ++) {
         for (int j = 0; j < output.numMeshCellsPerSideLength; j++){
@@ -79,16 +92,86 @@ mesh meshFrom(const double meshCellWidth, const double universeWidth, object* ob
                 pos.x = (((double) i) / ((double) output.numMeshCellsPerSideLength)) * output.universeWidth - (0.5 * meshCellWidth); 
                 pos.y = (((double) j) / ((double) output.numMeshCellsPerSideLength)) * output.universeWidth - (0.5 * meshCellWidth);
                 pos.z = (((double) k) / ((double) output.numMeshCellsPerSideLength)) * output.universeWidth - (0.5 * meshCellWidth);
-                output.meshCells[i][j][k].pos = pos;
+                indexMesh(&output,i,j,k)->pos = pos;
             }
         }
     }
+    printf("Got Past Initialisation of posititions of meshcells\n");
 
     assignObjectsToMesh(objects,numObjects,&output);
 
+    return output;
 
 
 
+
+}
+
+vec3 accelerationBetweenObjects(mesh* inputMesh, int A, int B){
+    const double g = 6.67e-11;
+    const double epsilon = inputMesh->epsilon;
+    vec3 outputAcc = inputMesh->objects[A].acc;
+    const vec3 iPos = inputMesh->objects[A].pos;
+    const double iMass = inputMesh->objects[A].mass;
+
+    const vec3 jPos = inputMesh->objects[B].pos;
+    const double jMass = inputMesh->objects[B].mass;
+
+    const vec3 seperation = sub_vec3(&jPos,&iPos); // Should be the other way round but more computationally efficient to encode the minus sign here
+    const double acc_mul = (g * jMass) / sqrt(pow(vec3_mag_squared(seperation) + epsilon*epsilon,3.0));
+    const vec3 acc_mul_sep = scalar_mul_vec3(acc_mul,&seperation);
+    outputAcc = add_vec3(&outputAcc,&acc_mul_sep);
+    return outputAcc;
+}
+
+void getNeighbhors(int* inputArray, const int i, const int j, const int k, mesh* inputMesh){
+    int counter = 0;
+    const int numCells = inputMesh->numMeshCellsPerSideLength;
+    printf("Num mesh cells per side length = %d\n",numCells);
+    for (int iLoop = -1; iLoop < 2; iLoop++){
+         for (int jLoop = -1; jLoop < 2; jLoop++){
+            for (int kLoop = -1; kLoop < 2; kLoop++){ // This gives the correct number of 
+                
+                // Logic goes here
+                //TODO: Do this function
+                const int newI = i + iLoop;
+                const int newJ = j + jLoop;
+                const int newK = k + kLoop;
+                // // Check that the new i,j,k's are valid
+                
+                const unsigned char iNotValid = (newI >= numCells) || (newI < 0);
+                const unsigned char jNotValid = (newJ >= numCells) || (newJ < 0);
+                const unsigned char kNotValid = (newK >= numCells) || (newK < 0);
+                if (iNotValid || jNotValid || kNotValid){
+                    inputArray[counter] = -1;
+                    counter++;
+                    continue;
+                }
+                printf("Counter: %d | i,j,k = %d,%d,%d\n",counter,newI,newJ,newK);
+                printf(" | i , j , k = %d, %d, %d\n",newI,newJ,newK);
+                
+                meshCell* temp = indexMesh(inputMesh,newI,newJ,newK);
+                const int head = temp->head;
+                printf("Read i,j,k = %d,%d,%d\n",newI,newJ,newK);
+                fflush(stdout);
+                inputArray[counter] = head;
+                
+                // and ends before here
+                counter++;
+
+                
+        
+            }
+        }   
+    }
+}
+
+void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned int j,const unsigned int k ){
+    meshCell* cell = indexMesh(inputMesh,i,j,k);
+    int neighbhors[27]; // max neighbhors = 27 = 3**3 
+    // redo function
+    getNeighbhors(neighbhors,i,j,k,inputMesh);        
+ 
 }
 
 // Calculate short range forces on each mesh using leapfrog method
@@ -111,70 +194,9 @@ void shortRangeForces(mesh* inputMesh){
    }
 }
 
-void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned int j,const unsigned int k ){
-    meshCell* cell = &inputMesh->meshCells[i][j][k];
-    int neighbhors[27]; // max neighbhors = 27 = 3**3 
-    neighbhors[26] = cell->head;
-    getAdjacentCells(&neighbhors,inputMesh,i,j,k); // 0 - 25 are potentially adjacent cells, or 
-    // Loop through every object in Cell
-    for (int i = cell->head; i != -1; i = inputMesh->objects[i].next){
-        // Loop through every object in this or neighbhoring cells
-        vec3 accelForIthObject = vec3From(0.0,0.0,0.0);
-        for (int j = 0; j < 27; j ++){
-            int temp = neighbhors[j];
-            if (temp == -1)
-                continue;
-            for (int k = temp, k != -1; k = inputMesh->objects[k].next){
-                if (i == k)
-                    continue;
-                vec3 acc = accelerationBetweenObjects(inputMesh,i,k);
-                accelForIthObject = add_vec3(&accelForIthObject,&acc); 
-            }
-        }
-        inputMesh->objects[i].acc = accelForIthObject;
-        
-    }
-}
 
-void getAdjacentCells(int* neighbhorArray, mesh* inputMesh, int i, int j, int k){
-    unsigned int counter = 0;
-    for (int iLoop = i-1; iLoop <= i + 1; iLoop++){
-        for (int jLoop = j-1; jLoop <= j + 1; jLoop++){
-            for (int kLoop = k-1; iLoop <= k + 1; kLoop++){
-                if ((iLoop == i) && (jLoop == j) && (kLoop == k))
-                    continue;
-                // Test to see if on the edges
-                if (((iLoop >= inputMesh->numMeshCellsPerSideLength) || iLoop < 0) || ((jLoop >= inputMesh->numMeshCellsPerSideLength) || jLoop < 0) || ((kLoop >= inputMesh->numMeshCellsPerSideLength) || kLoop < 0)){
-                    neighbhorArray[counter] = -1;
-                    counter++;
-                    continue;
-                } else { // else write head to neighbhor array, this else isn't needed but I think it makes the code easier to follow.
-                    neighbhorArray[counter] = inputMesh->meshCells[iLoop][jLoop][kLoop].head;
-                    counter++;
-                    continue;
-                }
 
-            }
-        }   
-    }
-}
 
-vec3 accelerationBetweenObjects(mesh* inputMesh, int A, int B){
-    const double g = 6.67e-11;
-    const double epsilon = inputMesh->epsilon;
-    vec3 outputAcc = inputMesh->objects[A].acc;
-    const vec3 iPos = inputMesh->objects[A].pos;
-    const double iMass = inputMesh->objects[A].mass;
-
-    const vec3 jPos = inputMesh->objects[B].pos;
-    const double jMass = inputMesh->objects[B].mass;
-
-    const vec3 seperation = sub_vec3(&jPos,&iPos); // Should be the other way round but more computationally efficient to encode the minus sign here
-    const double acc_mul = (g * jMass) / sqrt(pow(vec3_mag_squared(seperation) + epsilon*epsilon,3.0));
-    const vec3 acc_mul_sep = scalar_mul_vec3(acc_mul,&seperation);
-    outputAcc = add_vec3(&outputAcc,&acc_mul_sep);
-    return outputAcc;
-}
 
 
 
