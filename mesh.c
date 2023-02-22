@@ -65,11 +65,11 @@ mesh meshFrom(const double meshCellWidth, const double universeWidth, object* ob
     output.numObjects = numObjects;
     output.universeWidth = universeWidth;
     output.numMeshCellsPerSideLength = (unsigned int) (universeWidth / meshCellWidth);
-    printf("There are %d meshCells per side length\n",output.numMeshCellsPerSideLength);
+    // printf("There are %d meshCells per side length\n",output.numMeshCellsPerSideLength);
     output.numMeshCells = output.numMeshCellsPerSideLength * output.numMeshCellsPerSideLength * output.numMeshCellsPerSideLength; // cube it 
     output.cellWidth = meshCellWidth;
     output.epsilon = epsilon;
-    printf("Num mesh cells per side length = %d\n",output.numMeshCellsPerSideLength);
+    // printf("Num mesh cells per side length = %d\n",output.numMeshCellsPerSideLength);
     // Create array of meshcells
     output.meshCells = malloc(output.numMeshCells * sizeof(meshCell));
     if (output.meshCells == NULL){
@@ -127,7 +127,7 @@ vec3 accelerationBetweenObjects(mesh* inputMesh, int A, int B){
 void getNeighbhors(int* inputArray, const int i, const int j, const int k, mesh* inputMesh){
     int counter = 0;
     const int numCells = inputMesh->numMeshCellsPerSideLength;
-    printf("Num mesh cells per side length = %d\n",numCells);
+    // printf("Num mesh cells per side length = %d\n",numCells);
     for (int iLoop = -1; iLoop < 2; iLoop++){
          for (int jLoop = -1; jLoop < 2; jLoop++){
             for (int kLoop = -1; kLoop < 2; kLoop++){ // This gives the correct number of 
@@ -147,12 +147,12 @@ void getNeighbhors(int* inputArray, const int i, const int j, const int k, mesh*
                     counter++;
                     continue;
                 }
-                printf("Counter: %d | i,j,k = %d,%d,%d\n",counter,newI,newJ,newK);
-                printf(" | i , j , k = %d, %d, %d\n",newI,newJ,newK);
+                // printf("Counter: %d | i,j,k = %d,%d,%d\n",counter,newI,newJ,newK);
+                // printf(" | i , j , k = %d, %d, %d\n",newI,newJ,newK);
                 
                 meshCell* temp = indexMesh(inputMesh,newI,newJ,newK);
                 const int head = temp->head;
-                printf("Read i,j,k = %d,%d,%d\n",newI,newJ,newK);
+                // printf("Read i,j,k = %d,%d,%d\n",newI,newJ,newK);
                 fflush(stdout);
                 inputArray[counter] = head;
                 
@@ -169,8 +169,22 @@ void getNeighbhors(int* inputArray, const int i, const int j, const int k, mesh*
 void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned int j,const unsigned int k ){
     meshCell* cell = indexMesh(inputMesh,i,j,k);
     int neighbhors[27]; // max neighbhors = 27 = 3**3 
-    // redo function
-    getNeighbhors(neighbhors,i,j,k,inputMesh);        
+    getNeighbhors(neighbhors,i,j,k,inputMesh);  
+    // Loop through every object in cell
+    // Calculate acceleration between object in the cell and every object in the cell plus it's neighbhors
+    for (int iLoop = inputMesh->objects[indexMesh(inputMesh,i,j,k)->head]; iLoop != -1; iLoop = inputMesh->objects[iLoop].next){
+        vec3 accel = vec3From(0.0,0.0,0.0);
+        for (int jLoop = 0; jLoop < 27; jLoop++){
+            int kLoop = neighbhors[jLoop];
+            if (kLoop == -1){ //TODO: add cutof distance
+                continue;
+            }
+            vec3 temp = accelerationBetweenObjects(inputMesh,iLoop,jLoop);
+            accel = add_vec3(&accel,&temp);
+        }
+        inputMesh->objects[iLoop].acc = accel;
+
+    }
  
 }
 
@@ -192,6 +206,8 @@ void shortRangeForces(mesh* inputMesh){
             }
         }
    }
+
+
 }
 
 
