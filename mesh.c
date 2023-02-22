@@ -172,7 +172,7 @@ void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned i
     getNeighbhors(neighbhors,i,j,k,inputMesh);  
     // Loop through every object in cell
     // Calculate acceleration between object in the cell and every object in the cell plus it's neighbhors
-    for (int iLoop = inputMesh->objects[indexMesh(inputMesh,i,j,k)->head]; iLoop != -1; iLoop = inputMesh->objects[iLoop].next){
+    for (int iLoop = indexMesh(inputMesh,i,j,k)->head; iLoop != -1; iLoop = inputMesh->objects[iLoop].next){
         vec3 accel = vec3From(0.0,0.0,0.0);
         for (int jLoop = 0; jLoop < 27; jLoop++){
             int kLoop = neighbhors[jLoop];
@@ -208,6 +208,17 @@ void shortRangeForces(mesh* inputMesh){
    }
 
 
+}
+
+void meshCellLeapFrogStep(mesh* inputMesh, double dt){
+    shortRangeForces(inputMesh);
+
+    for (int i = 0; i < inputMesh->numObjects; i++){
+        vec3 temp = scalar_mul_vec3(dt,&inputMesh->objects[i].acc);
+        inputMesh->objects[i].vel = add_vec3(&inputMesh->objects[i].vel,&temp);
+        vec3 temp2 = scalar_mul_vec3(dt,&inputMesh->objects[i].vel);
+        inputMesh->objects[i].pos = add_vec3(&inputMesh->objects[i].pos,&temp2);
+    }
 }
 
 

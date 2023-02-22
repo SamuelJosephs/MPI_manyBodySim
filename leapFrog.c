@@ -92,10 +92,11 @@ void leapFrogSetup( object* const restrict inputArray, const unsigned int inputA
 
 
 void writeOutputToFile(FILE* file, const object* const restrict BUFFER, const unsigned int BUFF_LEN){
-    // Calculate the total kinetic and potential energies,
+    //Calculate the total kinetic and potential energies,
     double KE = 0.;
     double GPE = 0.;
-    
+    printf("Printing %d objects: \n",BUFF_LEN);
+    fflush(stdout);
     for (int i = 0; i < BUFF_LEN; i++){
         fprintf(file,"%f,%f,%f,%f,%f,%f,%f,%f,%f,",
                 BUFFER[i].mass,

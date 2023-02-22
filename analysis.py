@@ -4,13 +4,13 @@ import numpy as np
 
 radJupiter = 778e9
 
-db = pd.read_csv("output.csv",dtype = float).to_numpy(np.double)
+db = pd.read_csv("Test_Data.csv",dtype = float).to_numpy(np.double)
 
 arrTotalE = []
 arrTotalGPE = []
 arrTotalKE = []
 
-numParticles = int((int(len(db[10])) - int(3)) / int(9))
+numParticles = int((int(len(db[0])) - int(3)) / int(9))
 print(f"numParticles = {numParticles}")
 xPositions = np.zeros((numParticles,len(db))) # matrix where the i'th row is the i'th particle and the j'th column is it's position at the j'th timestep
 yPositions = np.zeros((numParticles,len(db))) #
