@@ -57,7 +57,7 @@ void assignObjectToMeshCell(int obNum,mesh* inputMesh,int* iOut, int* jOut, int*
         *iOut = i;
         *jOut = j;
         *kOut = k;
-        // printf("(i,j,k) = (%d,%d,%d)\n",i,j,k);
+        
         return;
     }
 
@@ -120,12 +120,11 @@ mesh meshFrom(const double meshCellWidth, const double universeWidth, object* ob
     output.numObjects = numObjects;
     output.universeWidth = universeWidth;
     output.numMeshCellsPerSideLength = (unsigned int) (universeWidth / meshCellWidth);
-    // printf("There are %d meshCells per side length\n",output.numMeshCellsPerSideLength);
+    
     output.numMeshCells = output.numMeshCellsPerSideLength * output.numMeshCellsPerSideLength * output.numMeshCellsPerSideLength; // cube it 
     output.cellWidth = meshCellWidth;
     output.epsilon = epsilon;
-    // printf("Num mesh cells per side length = %d\n",output.numMeshCellsPerSideLength);
-    // Create array of meshcells
+
     output.meshCells = malloc(output.numMeshCells * sizeof(meshCell));
     if (output.meshCells == NULL){
         fprintf(stderr,"Failed to allocate meshCells\n");
@@ -182,7 +181,7 @@ vec3 accelerationBetweenObjects(mesh* inputMesh, int A, int B){
 void getNeighbhors(int* inputArray, const int i, const int j, const int k, mesh* inputMesh){
     int counter = 0;
     const int numCells = inputMesh->numMeshCellsPerSideLength;
-    // printf("Num mesh cells per side length = %d\n",numCells);
+    
     for (int iLoop = -1; iLoop < 2; iLoop++){
          for (int jLoop = -1; jLoop < 2; jLoop++){
             for (int kLoop = -1; kLoop < 2; kLoop++){ // This gives the correct number of 
@@ -272,6 +271,7 @@ void shortRangeForces(mesh* inputMesh){
 }
 
 void moveObject(const int iOld,const  int jOld,const int kOld,const int iNew,const int jNew,const int kNew,mesh* inputMesh, const int objectIndex){
+    printf("Attempting to move object %d from (%d,%d,%d) -> (%d,%d,%d)\n",objectIndex,iOld,jOld,kOld,iNew,jNew,kNew);
     static int numCalls = 0;
     numCalls++;
     object* objects = inputMesh->objects;
@@ -280,9 +280,6 @@ void moveObject(const int iOld,const  int jOld,const int kOld,const int iNew,con
     meshCell* newMeshCell = indexMesh(inputMesh,iNew,jNew,kNew);
     int prior = -1;
 
-    objects[objectIndex].i = iNew;
-    objects[objectIndex].j = jNew;
-    objects[objectIndex].k = kNew;
     // find object in old meshCell
     for (int i = oldMeshCell->head; i != -1; i = objects[i].next){
         if (i == objectIndex){
@@ -338,32 +335,32 @@ void periodicBoxBoundary(int obNum, mesh* inputMesh){
     unsigned char changed = 0;
     if (pos.x < 0.0){
         pos.x = width;
-        vel.x = -1 * vel.x;
+        vel.x = -1 * abs(vel.x);
     }
 
    if (pos.x > width){
         pos.x = 0.0;
-        vel.x = -1 * vel.x;
+        vel.x =  abs(vel.x);
     }
 
     if (pos.y < 0.0){
         pos.y = width;
-        vel.y = -1 * vel.y;
+        vel.y = -1 * abs(vel.y);
     }
 
    if (pos.y > width){
         pos.y = 0;
-        vel.y = -1 * vel.y;
+        vel.y =  abs(vel.y);
     }
 
     if (pos.z < 0.0){
         pos.z = width;
-        vel.z = -1 * vel.z;
+        vel.z = -1 * abs(vel.z);
     }
 
    if (pos.z > width){
         pos.z = 0.0;
-        vel.z = -1 * vel.z;
+        vel.z = abs(vel.z);
     }
 
     inputMesh->objects[obNum].pos = pos;
@@ -393,10 +390,15 @@ void meshCellLeapFrogStep(mesh* inputMesh, double dt){
         // Check if outside of universe box
         periodicBoxBoundary(i,inputMesh);
         assignObjectToMeshCell(i,inputMesh,&xIndex,&yIndex,&zIndex);
+        if (xIndex < 0){
+            printf("xIndex = %d\n",xIndex);
+        }
         if ((xIndex != objects[i].i) || (yIndex != objects[i].j) || (zIndex != objects[i].k)){
             
             moveObject(objects[i].i,objects[i].j,objects[i].k,xIndex,yIndex,zIndex,inputMesh,i);
-            
+            objects[i].i = xIndex;
+            objects[i].j = yIndex;
+            objects[i].k = zIndex;
 
         }
         
