@@ -71,3 +71,29 @@ object* sphericalDistribution(int* NUM_OBJECTS,double epsilon, double dt){
 	printf("Count = %d\n",count);
 	return outArray;
 }
+
+object* uniformRandom(const int NUM_OBJECTS,double epsilon, double dt,const double universeWidth){
+	object* objects = malloc(NUM_OBJECTS * sizeof(object));
+	srand(1);
+	const vec3 zeroVec = vec3From(0.0,0.0,0.0);
+	for (int i = 0; i < NUM_OBJECTS; i++){
+		object temp;
+		vec3 pos;
+		temp.acc = zeroVec;
+		temp.GPE = 0.0;
+		temp.KE = 0.0;
+		temp.mass = 10*MASS_Earth;
+		temp.next = -1;
+
+		pos.x = (((float) rand())/(float) RAND_MAX) * universeWidth;
+		pos.y = (((float) rand())/(float) RAND_MAX) * universeWidth;
+		pos.z = (((float) rand())/(float) RAND_MAX) * universeWidth;
+
+		temp.pos = pos;
+		temp.vel = zeroVec;
+		temp.numTimesMoved = 0;
+		objects[i] = temp;	
+	}
+	return objects;
+}
+
