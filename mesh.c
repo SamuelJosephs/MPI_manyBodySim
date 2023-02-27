@@ -15,6 +15,7 @@
 // I.E.: IF an object leaves the domain of the "universe" it appears in the opposite side
 typedef struct meshCell {
     int head; // head of chain
+    int potentialhead;
     vec3 pos; // position of center of cell;
     double rho;
 
@@ -23,8 +24,12 @@ typedef struct meshCell {
 typedef struct mesh {
     unsigned int numMeshCells;
     unsigned int numMeshCellsPerSideLength;
+    unsigned int numPotentialMeshCellsPerSideLength;
+    unsigned int numPotentialMeshCells;
     meshCell* meshCells;
+    meshCell* potentialMeshCells;
     double cellWidth;
+    double potentialCellWidth;
     double universeWidth;
     object* objects;
     unsigned int numObjects;
@@ -36,9 +41,12 @@ typedef struct mesh {
 
 meshCell* indexMesh(const mesh* inputMesh, int i, int j, int k){
     const int N = inputMesh->numMeshCellsPerSideLength;
-    return &(inputMesh->meshCells[((k * N*N) + (j*N) + i)]) ;
+    return &(inputMesh->meshCells[((i * N*N) + (j*N) + k)]); // Row major order
 }
-
+meshCell* indexPotentialMesh(const mesh* inputMesh, int i, int j, int k){
+    const int N = inputMesh->numPotentialMeshCellsPerSideLength;
+    return &(inputMesh->potentialMeshCells[((i * N*N) + (j*N) + k)]);
+}
 void assignObjectToMeshCell(int obNum,mesh* inputMesh,int* iOut, int* jOut, int* kOut){
     // Work out fraction across x,y, and z axis
     object ob = inputMesh->objects[obNum];
@@ -67,6 +75,32 @@ void assignObjectToMeshCell(int obNum,mesh* inputMesh,int* iOut, int* jOut, int*
     cell->head = obNum;
 }
 
+void assignObjectToPotentialMeshCell(int obNum,mesh* inputMesh,int* iOut, int* jOut, int* kOut){
+    // Work out fraction across x,y, and z axis
+    object ob = inputMesh->objects[obNum];
+    double width = inputMesh->universeWidth;
+    int numCells = inputMesh->numPotentialMeshCellsPerSideLength;
+    double fracX = ob.pos.x / width;
+    double fracY = ob.pos.y / width;
+    double fracZ = ob.pos.z / width;
+
+    // Use this to work out where it should be in the Mesh
+    int i = (int)(fracX * (double)numCells -0.5);
+    int j = (int)(fracY * (double)numCells - 0.5);
+    int k = (int)(fracZ * (double)numCells - 0.5);
+
+    if (iOut != NULL || jOut != NULL || kOut != NULL){
+        *iOut = i;
+        *jOut = j;
+        *kOut = k;
+        
+        return;
+    }
+    meshCell* cell = indexPotentialMesh(inputMesh,i,j,k);
+    // Prepend to linked list in Cell
+    inputMesh->objects[obNum].nextPotentialMesh = cell->potentialhead;
+    cell->potentialhead = obNum;
+}
 
 void printMeshCellObjects(meshCell* inputCell,mesh* inputMesh){
     
@@ -108,24 +142,29 @@ void assignObjectsToMesh(object* objects,const unsigned int numObjects, mesh* in
         objects[i].j = jPos;
         objects[i].k = kPos;
         assignObjectToMeshCell(i,inputMesh,NULL,NULL,NULL);
-
+        assignObjectToPotentialMeshCell(i,inputMesh,NULL,NULL,NULL);
 
     }
+    
 }
 
-mesh meshFrom(const double meshCellWidth, const double universeWidth, object* objects, int numObjects,double epsilon){
+mesh meshFrom(const double meshCellWidth, const double universeWidth, int numPotentialMeshCellsPerMeshCell, object* objects, int numObjects,double epsilon){
     mesh output;
     output.numIterationsPast = 0;
     output.objects = objects;
     output.numObjects = numObjects;
     output.universeWidth = universeWidth;
     output.numMeshCellsPerSideLength = (unsigned int) (universeWidth / meshCellWidth);
-    
+    output.numPotentialMeshCellsPerSideLength = (unsigned int) output.numMeshCellsPerSideLength * numPotentialMeshCellsPerMeshCell;
+    output.numPotentialMeshCells = output.numPotentialMeshCellsPerSideLength * output.numPotentialMeshCellsPerSideLength * output.numPotentialMeshCellsPerSideLength; // cube it 
+     
     output.numMeshCells = output.numMeshCellsPerSideLength * output.numMeshCellsPerSideLength * output.numMeshCellsPerSideLength; // cube it 
     output.cellWidth = meshCellWidth;
+    output.potentialCellWidth = universeWidth / output.numPotentialMeshCellsPerSideLength;
     output.epsilon = epsilon;
 
     output.meshCells = malloc(output.numMeshCells * sizeof(meshCell));
+    output.potentialMeshCells = malloc(output.numPotentialMeshCells * sizeof(meshCell)); 
     if (output.meshCells == NULL){
         fprintf(stderr,"Failed to allocate meshCells\n");
         exit(1);
@@ -136,6 +175,10 @@ mesh meshFrom(const double meshCellWidth, const double universeWidth, object* ob
         output.meshCells[i] = temp; // Maybe undefined behaviour. Initialise heads to be empty (-1).
         output.meshCells[i].head = -1;
         
+    }
+    for (int i = 0; i < output.numPotentialMeshCellsPerSideLength; i++){
+        output.potentialMeshCells[i] = temp;
+        output.potentialMeshCells[i].head = -1;
     }
     printf("Got Past Initialisation of meshcells\n");
 
@@ -150,7 +193,18 @@ mesh meshFrom(const double meshCellWidth, const double universeWidth, object* ob
             }
         }
     }
-    printf("Got Past Initialisation of posititions of meshcells\n");
+    for (int i = 0; i < output.numPotentialMeshCellsPerSideLength; i ++) {
+        for (int j = 0; j < output.numPotentialMeshCellsPerSideLength; j++){
+            for (int k = 0; k < output.numPotentialMeshCellsPerSideLength; k ++){
+                vec3 pos;
+                pos.x = (((double) i) / ((double) output.numPotentialMeshCellsPerSideLength)) * output.universeWidth - (0.5 * output.potentialCellWidth); 
+                pos.y = (((double) j) / ((double) output.numPotentialMeshCellsPerSideLength)) * output.universeWidth - (0.5 * output.potentialCellWidth);
+                pos.z = (((double) k) / ((double) output.numPotentialMeshCellsPerSideLength)) * output.universeWidth - (0.5 * output.potentialCellWidth);
+                indexPotentialMesh(&output,i,j,k)->pos = pos;
+            }
+        }
+    }
+    printf("Got Past Initialisation of posititions of meshcells and potential mesh cells\n");
 
     assignObjectsToMesh(objects,numObjects,&output);
 
@@ -224,7 +278,9 @@ void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned i
     int neighbhors[27]; // max neighbhors = 27 = 3**3 
     getNeighbhors(neighbhors,i,j,k,inputMesh);  
     // Loop through every i'th object in cell
+    printf("Aaccelerationf from: \n");
     for (int i = cell->head; i != -1; i = inputMesh->objects[i].next){
+        printf("%d,",i);
         vec3 accel = vec3From(0.0,0.0,0.0);
         for (int j = 0; j < 27; j++){
             if (neighbhors[j] == -1){
@@ -243,6 +299,7 @@ void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned i
         }
         inputMesh->objects[i].acc = accel;
     }
+    printf("\n\n");
 
  
 }

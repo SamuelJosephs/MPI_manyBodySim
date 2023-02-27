@@ -7,21 +7,22 @@ const double universeWidth = 20.0 * 778e9;
 
 
 int main(){
-    int numObjects = 100;
+    int numObjects = 200;
     object* distribution = uniformRandom(numObjects,epsilon,dt,universeWidth);
     leapFrogSetup(distribution,numObjects,epsilon,dt);
-    mesh domainMesh = meshFrom(universeWidth/20.0,universeWidth,distribution,numObjects,epsilon);
+    mesh domainMesh = meshFrom(universeWidth/2.0,universeWidth,2,distribution,numObjects,epsilon);
     FILE* outputFile = fopen("Test_Data.csv","w+");
     printf("Num mesh cells per side length from main = %d\n",domainMesh.numMeshCellsPerSideLength);
     int counter = 0;
+    printf("Num Mesh Cells Per side length: %d\n",domainMesh.numMeshCellsPerSideLength);
     for (int i = 0; i < domainMesh.numMeshCells; i++){
+        printf("Accsessing the %d'th meshCell out of %d\n",i,domainMesh.numMeshCells);
         printMeshCellObjects(&domainMesh.meshCells[i],&domainMesh);
         
     }
     
-    printMeshCellObjects(indexMesh(&domainMesh,0,4,0),&domainMesh);
-    printMeshCellObjects(indexMesh(&domainMesh,2,4,1),&domainMesh);
-    for (int i = 0; i < 100; i++){
+
+    for (int i = 0; i < 300; i++){
         meshCellLeapFrogStep(&domainMesh,dt);
 
 
@@ -38,6 +39,7 @@ int main(){
     printf("Succsess!\n");
     free(domainMesh.meshCells);
     free(distribution);
+    fflush(stdout);
     
 
 }
