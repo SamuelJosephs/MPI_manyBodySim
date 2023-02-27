@@ -11,6 +11,7 @@
 #endif
 
 #include "common.h"
+#include "fftw3.h"
 // TODO: Check if object moves to a different cell and impose periodic boundary's 
 // I.E.: IF an object leaves the domain of the "universe" it appears in the opposite side
 typedef struct meshCell {
@@ -110,6 +111,8 @@ void printMeshCellObjects(meshCell* inputCell,mesh* inputMesh){
     printf("\nEnd of objects\n");
 }
 
+
+
 void findObjectInMesh(mesh* inputMesh, int objectNum,int* iOut, int* jOut, int*kOut){
     const int numCells = inputMesh->numMeshCellsPerSideLength;
     for (int i = 0; i < numCells; i++){
@@ -130,6 +133,30 @@ void findObjectInMesh(mesh* inputMesh, int objectNum,int* iOut, int* jOut, int*k
             }
         }
     }
+    return;
+}
+
+void findObjectInPotentialMesh(mesh* inputMesh, int objectNum,int* iOut, int* jOut, int*kOut){
+    const int numCells = inputMesh->numPotentialMeshCellsPerSideLength;
+    for (int i = 0; i < numCells; i++){
+        for (int j = 0; j < numCells; j++){
+            for (int k = 0; k < numCells; k++){
+                meshCell* cell = indexPotentialMesh(inputMesh,i,j,k);
+                for (int l = cell->potentialhead ; ;l = inputMesh->objects[l].nextPotentialMesh){
+                    if (l == objectNum){
+                        *iOut = i;
+                        *jOut = j;
+                        *kOut = k;
+                        return;
+                    }
+                    if (l == -1){
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    return;
 }
 
 void assignObjectsToMesh(object* objects,const unsigned int numObjects, mesh* inputMesh){
@@ -142,6 +169,14 @@ void assignObjectsToMesh(object* objects,const unsigned int numObjects, mesh* in
         objects[i].j = jPos;
         objects[i].k = kPos;
         assignObjectToMeshCell(i,inputMesh,NULL,NULL,NULL);
+
+        int iPosPotential;
+        int jPosPotential;
+        int kPosPotential;
+        assignObjectToPotentialMeshCell(i,inputMesh,&iPosPotential,&jPosPotential,&kPosPotential);
+        objects[i].iPotential = iPosPotential;
+        objects[i].jPotential = jPosPotential;
+        objects[i].kPotential = kPosPotential;
         assignObjectToPotentialMeshCell(i,inputMesh,NULL,NULL,NULL);
 
     }
@@ -381,6 +416,57 @@ void moveObject(const int iOld,const  int jOld,const int kOld,const int iNew,con
 
 }
 
+// Same a moveObject but for potential mesh
+void moveObjectPotential(const int iOld,const  int jOld,const int kOld,const int iNew,const int jNew,const int kNew,mesh* inputMesh, const int objectIndex){
+    printf("Attempting to move object %d from (%d,%d,%d) PotentialMeshCell-> (%d,%d,%d)PotentialMeshCell\n",objectIndex,iOld,jOld,kOld,iNew,jNew,kNew);
+    static int numCalls = 0;
+    numCalls++;
+    object* objects = inputMesh->objects;
+    objects[objectIndex].numTimesMoved++;
+    meshCell* oldMeshCell = indexPotentialMesh(inputMesh,iOld,jOld,kOld);
+    meshCell* newMeshCell = indexPotentialMesh(inputMesh,iNew,jNew,kNew);
+    int prior = -1;
+
+    // find object in old meshCell
+    for (int i = oldMeshCell->potentialhead; i != -1; i = objects[i].nextPotentialMesh){
+        if (i == objectIndex){
+            
+            // Remove from old list
+            if (i == oldMeshCell->potentialhead){ // if I is the first entry in the list
+                oldMeshCell->potentialhead = objects[objectIndex].nextPotentialMesh;
+                // add to new list
+                objects[objectIndex].nextPotentialMesh = newMeshCell->potentialhead;
+                newMeshCell->potentialhead = objectIndex;
+                
+                return;
+            }
+            // Remove from old list
+            objects[prior].nextPotentialMesh = objects[objectIndex].nextPotentialMesh;
+            // Add to new list
+            objects[objectIndex].nextPotentialMesh = newMeshCell->potentialhead;
+            newMeshCell->potentialhead = objectIndex;
+            return;
+
+        }
+        prior = i;
+    }
+
+    fprintf(stderr,"\nFailed to find object in meshcell\n Attempted to move object %d from (%d,%d,%d) -> (%d,%d,%d)\n Function has been called %d time(s).\n",objectIndex,iOld,jOld,kOld,iNew,jNew,kNew,numCalls);
+    printf("Here are the objects contained in oldMeshCell:\n");
+    printMeshCellObjects(oldMeshCell,inputMesh);
+    printf("Here are the objects contained in newMeshCell:\n");
+    printMeshCellObjects(newMeshCell,inputMesh);
+    int actualI;
+    int actualJ;
+    int actualK;
+    findObjectInPotentialMesh(inputMesh,objectIndex,&actualI,&actualJ,&actualK); // Note: This will return the objects meshCell coordinates not nextMeshCell coordinates;
+    printf("Object %d is located in mechCell (%d,%d,%d) and has been moved %d times\n",objectIndex,actualI,actualJ,actualK,objects[objectIndex].numTimesMoved);
+    printf("There have been %d iterations\n",inputMesh->numIterationsPast);
+    exit(1);
+
+
+}
+
 void periodicBoxBoundary(int obNum, mesh* inputMesh){
     object ob = inputMesh->objects[obNum];
     vec3 pos = ob.pos;
@@ -442,11 +528,16 @@ void meshCellLeapFrogStep(mesh* inputMesh, double dt){
         int xIndex;
         int yIndex;
         int zIndex;
+
+        int xIndexPotential;
+        int yIndexPotential;
+        int zIndexPotential;
         
         
         // Check if outside of universe box
         periodicBoxBoundary(i,inputMesh);
         assignObjectToMeshCell(i,inputMesh,&xIndex,&yIndex,&zIndex);
+        assignObjectToPotentialMeshCell(i,inputMesh,&xIndexPotential,&yIndexPotential,&zIndexPotential);
         if (xIndex < 0){
             printf("xIndex = %d\n",xIndex);
         }
@@ -457,8 +548,18 @@ void meshCellLeapFrogStep(mesh* inputMesh, double dt){
             objects[i].j = yIndex;
             objects[i].k = zIndex;
 
+
         }
-        
+        if ((xIndexPotential != objects[i].iPotential) || (yIndexPotential != objects[i].jPotential) || (zIndexPotential != objects[i].kPotential)){
+
+            moveObjectPotential(objects[i].iPotential,objects[i].jPotential,objects[i].kPotential,xIndexPotential,yIndexPotential,zIndexPotential,inputMesh,i);
+            objects[i].iPotential = xIndexPotential;
+            objects[i].jPotential = yIndexPotential; 
+            objects[i].kPotential = zIndexPotential;
+            
+
+            
+        }        
 
 
     }
