@@ -12,6 +12,14 @@ typedef struct {
     double KE;
     double GPE;
     int next; // next object in head, -1 means you are at the ned of the list
+    int nextPotentialMesh;
+    int i;
+    int j;
+    int k;
+    int iPotential;
+    int jPotential;
+    int kPotential;
+    int numTimesMoved;
 } object;
 
 object obFrom(vec3 pos, vec3 vel, vec3 acc, double mass, double KE, double GPE){

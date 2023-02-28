@@ -84,6 +84,7 @@ object* uniformRandom(const int NUM_OBJECTS,double epsilon, double dt,const doub
 		temp.KE = 0.0;
 		temp.mass = 10*MASS_Earth;
 		temp.next = -1;
+		temp.nextPotentialMesh = -1;
 
 		pos.x = (((float) rand())/(float) RAND_MAX) * universeWidth;
 		pos.y = (((float) rand())/(float) RAND_MAX) * universeWidth;
@@ -97,3 +98,37 @@ object* uniformRandom(const int NUM_OBJECTS,double epsilon, double dt,const doub
 	return objects;
 }
 
+
+object* uniform(const int numObjectsPerSideLength,double epsilon, double dt,const double universeWidth){
+	object* output = malloc(numObjectsPerSideLength * numObjectsPerSideLength * numObjectsPerSideLength * sizeof(object));
+	if (output == NULL){
+		fprintf(stderr, "Failed to allocate objects\n");
+		exit(1);
+	}
+	vec3 zeroVec = vec3From(0.0,0.0,0.0);
+	for (int i = 0; i < numObjectsPerSideLength; i++){
+		for (int j = 0; j < numObjectsPerSideLength; j++){
+			for (int k = 0; k < numObjectsPerSideLength; k++){
+				// Work out position of object
+				vec3 pos;
+				pos.x = (double) i * (universeWidth / (double) numObjectsPerSideLength);
+				pos.y = (double) j * (universeWidth / (double) numObjectsPerSideLength);
+				pos.z = (double) k * (universeWidth / (double) numObjectsPerSideLength);
+				object ob;
+				ob.pos = pos;
+				ob.vel = zeroVec;
+				ob.acc = zeroVec;
+				ob.next = -1;
+				ob.nextPotentialMesh = -1;
+				ob.mass = MASS_Earth;
+				ob.KE = 0.0;
+				ob.GPE = 0.0;
+				int index = (numObjectsPerSideLength*numObjectsPerSideLength*i + numObjectsPerSideLength*j + k );
+				output[index] = ob;
+
+			}
+		}
+	}
+
+	return output;
+}

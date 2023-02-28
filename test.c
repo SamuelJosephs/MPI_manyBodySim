@@ -7,10 +7,11 @@ const double universeWidth = 20.0 * 778e9;
 
 
 int main(){
-    int numObjects = 200;
-    object* distribution = uniformRandom(numObjects,epsilon,dt,universeWidth);
+    int numObjectsPerSideLength = 3;
+    int numObjects = numObjectsPerSideLength * numObjectsPerSideLength * numObjectsPerSideLength;
+    object* distribution = uniform(numObjectsPerSideLength,epsilon,dt,universeWidth);
     leapFrogSetup(distribution,numObjects,epsilon,dt);
-    mesh domainMesh = meshFrom(universeWidth/2.0,universeWidth,2,distribution,numObjects,epsilon);
+    mesh domainMesh = meshFrom(universeWidth/20,universeWidth,10,distribution,numObjects,epsilon);
     FILE* outputFile = fopen("Test_Data.csv","w+");
     printf("Num mesh cells per side length from main = %d\n",domainMesh.numMeshCellsPerSideLength);
     int counter = 0;

@@ -11,14 +11,15 @@
 #endif
 
 #include "common.h"
+#include <complex.h>
 #include "fftw3.h"
 // TODO: Check if object moves to a different cell and impose periodic boundary's 
 // I.E.: IF an object leaves the domain of the "universe" it appears in the opposite side
 typedef struct meshCell {
     int head; // head of chain
-    int potentialhead;
     vec3 pos; // position of center of cell;
     double rho;
+    double volume;
 
 } meshCell;
 
@@ -36,10 +37,20 @@ typedef struct mesh {
     unsigned int numObjects;
     double epsilon;
     int numIterationsPast;
+    fftw_complex* rho_array;
+    fftw_plan plan;
+    fftw_complex* kxArray;
+    fftw_plan kxplan;
+    fftw_complex* kyArray;
+    fftw_plan kyplan;
+    fftw_complex* kzArray;
+    fftw_plan kzplan;
 } mesh;
 
 
-
+int indexArray(int i, int j, int k, int N){
+    return ((N*N*i) + N*j + k);
+}
 meshCell* indexMesh(const mesh* inputMesh, int i, int j, int k){
     const int N = inputMesh->numMeshCellsPerSideLength;
     return &(inputMesh->meshCells[((i * N*N) + (j*N) + k)]); // Row major order
@@ -47,6 +58,12 @@ meshCell* indexMesh(const mesh* inputMesh, int i, int j, int k){
 meshCell* indexPotentialMesh(const mesh* inputMesh, int i, int j, int k){
     const int N = inputMesh->numPotentialMeshCellsPerSideLength;
     return &(inputMesh->potentialMeshCells[((i * N*N) + (j*N) + k)]);
+}
+
+fftw_complex* indexRhoArray(const mesh* inputMesh, int i, int j, int k){
+    const int N = inputMesh->numPotentialMeshCellsPerSideLength;
+    return &(inputMesh->rho_array[((i*N*N) + (j*N) + k)]);
+    
 }
 void assignObjectToMeshCell(int obNum,mesh* inputMesh,int* iOut, int* jOut, int* kOut){
     // Work out fraction across x,y, and z axis
@@ -74,6 +91,9 @@ void assignObjectToMeshCell(int obNum,mesh* inputMesh,int* iOut, int* jOut, int*
     // Prepend to linked list in Cell
     inputMesh->objects[obNum].next = cell->head;
     cell->head = obNum;
+    if (cell->head == inputMesh->objects[cell->head].next){
+        fprintf(stderr,"cell->head = objects[cell->head].next, this will result in an infite loop when traversing the list\n");
+    }
 }
 
 void assignObjectToPotentialMeshCell(int obNum,mesh* inputMesh,int* iOut, int* jOut, int* kOut){
@@ -99,8 +119,13 @@ void assignObjectToPotentialMeshCell(int obNum,mesh* inputMesh,int* iOut, int* j
     }
     meshCell* cell = indexPotentialMesh(inputMesh,i,j,k);
     // Prepend to linked list in Cell
-    inputMesh->objects[obNum].nextPotentialMesh = cell->potentialhead;
-    cell->potentialhead = obNum;
+    fprintf(stderr, "Potential: Cell Head = %d, next: %d\n",cell->head,inputMesh->objects[cell->head].nextPotentialMesh);
+    inputMesh->objects[obNum].nextPotentialMesh = cell->head;
+    cell->head = obNum;
+    if (cell->head == inputMesh->objects[obNum].nextPotentialMesh){
+        fprintf(stderr,"Potential: Cell head == obnum.nextPotentialMesh, %d,%d This will cause an infinite loop\n",cell->head,inputMesh->objects[obNum].nextPotentialMesh);
+        // exit(1);
+    }
 }
 
 void printMeshCellObjects(meshCell* inputCell,mesh* inputMesh){
@@ -111,7 +136,13 @@ void printMeshCellObjects(meshCell* inputCell,mesh* inputMesh){
     printf("\nEnd of objects\n");
 }
 
-
+void printPotentialMeshCellObjects(const meshCell* inputCell,const mesh* inputMesh){
+    
+    for (int itemp = inputCell->head; itemp != -1; itemp = inputMesh->objects[itemp].nextPotentialMesh){
+        printf("%i Index:(%d,%d,%d), ",itemp,inputMesh->objects[itemp].i,inputMesh->objects[itemp].j,inputMesh->objects[itemp].k);
+    }
+    printf("\nEnd of objects\n");
+}
 
 void findObjectInMesh(mesh* inputMesh, int objectNum,int* iOut, int* jOut, int*kOut){
     const int numCells = inputMesh->numMeshCellsPerSideLength;
@@ -142,7 +173,7 @@ void findObjectInPotentialMesh(mesh* inputMesh, int objectNum,int* iOut, int* jO
         for (int j = 0; j < numCells; j++){
             for (int k = 0; k < numCells; k++){
                 meshCell* cell = indexPotentialMesh(inputMesh,i,j,k);
-                for (int l = cell->potentialhead ; ;l = inputMesh->objects[l].nextPotentialMesh){
+                for (int l = cell->head ; ;l = inputMesh->objects[l].nextPotentialMesh){
                     if (l == objectNum){
                         *iOut = i;
                         *jOut = j;
@@ -199,7 +230,23 @@ mesh meshFrom(const double meshCellWidth, const double universeWidth, int numPot
     output.epsilon = epsilon;
 
     output.meshCells = malloc(output.numMeshCells * sizeof(meshCell));
-    output.potentialMeshCells = malloc(output.numPotentialMeshCells * sizeof(meshCell)); 
+    output.potentialMeshCells = malloc(output.numPotentialMeshCells * sizeof(meshCell));
+    output.rho_array = fftw_malloc(output.numPotentialMeshCells * sizeof(fftw_complex));
+    output.kxArray = fftw_malloc(output.numPotentialMeshCells * sizeof(fftw_complex));
+    output.kyArray = fftw_malloc(output.numPotentialMeshCells * sizeof(fftw_complex));
+    output.kzArray = fftw_malloc(output.numPotentialMeshCells * sizeof(fftw_complex));
+
+
+
+    int N = output.numPotentialMeshCellsPerSideLength;
+    printf("Setting up fftw plans\n");
+    output.plan = fftw_plan_dft_3d(N,N,N,output.rho_array,output.rho_array,FFTW_FORWARD,FFTW_MEASURE);
+    output.kxplan = fftw_plan_dft_3d(N,N,N,output.kxArray,output.kxArray,FFTW_BACKWARD,FFTW_MEASURE);
+    output.kyplan = fftw_plan_dft_3d(N,N,N,output.kyArray,output.kyArray,FFTW_BACKWARD,FFTW_MEASURE);
+    output.kzplan = fftw_plan_dft_3d(N,N,N,output.kzArray,output.kzArray,FFTW_BACKWARD,FFTW_MEASURE);
+
+
+
     if (output.meshCells == NULL){
         fprintf(stderr,"Failed to allocate meshCells\n");
         exit(1);
@@ -211,9 +258,11 @@ mesh meshFrom(const double meshCellWidth, const double universeWidth, int numPot
         output.meshCells[i].head = -1;
         
     }
-    for (int i = 0; i < output.numPotentialMeshCellsPerSideLength; i++){
+    double vol = output.potentialCellWidth * output.potentialCellWidth * output.potentialCellWidth; 
+    for (int i = 0; i < output.numPotentialMeshCells; i++){
         output.potentialMeshCells[i] = temp;
         output.potentialMeshCells[i].head = -1;
+        output.potentialMeshCells[i].volume = vol;
     }
     printf("Got Past Initialisation of meshcells\n");
 
@@ -313,9 +362,7 @@ void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned i
     int neighbhors[27]; // max neighbhors = 27 = 3**3 
     getNeighbhors(neighbhors,i,j,k,inputMesh);  
     // Loop through every i'th object in cell
-    printf("Aaccelerationf from: \n");
     for (int i = cell->head; i != -1; i = inputMesh->objects[i].next){
-        printf("%d,",i);
         vec3 accel = vec3From(0.0,0.0,0.0);
         for (int j = 0; j < 27; j++){
             if (neighbhors[j] == -1){
@@ -334,7 +381,6 @@ void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned i
         }
         inputMesh->objects[i].acc = accel;
     }
-    printf("\n\n");
 
  
 }
@@ -363,7 +409,7 @@ void shortRangeForces(mesh* inputMesh){
 }
 
 void moveObject(const int iOld,const  int jOld,const int kOld,const int iNew,const int jNew,const int kNew,mesh* inputMesh, const int objectIndex){
-    printf("Attempting to move object %d from (%d,%d,%d) -> (%d,%d,%d)\n",objectIndex,iOld,jOld,kOld,iNew,jNew,kNew);
+    // printf("Attempting to move object %d from (%d,%d,%d) -> (%d,%d,%d)\n",objectIndex,iOld,jOld,kOld,iNew,jNew,kNew);
     static int numCalls = 0;
     numCalls++;
     object* objects = inputMesh->objects;
@@ -418,7 +464,7 @@ void moveObject(const int iOld,const  int jOld,const int kOld,const int iNew,con
 
 // Same a moveObject but for potential mesh
 void moveObjectPotential(const int iOld,const  int jOld,const int kOld,const int iNew,const int jNew,const int kNew,mesh* inputMesh, const int objectIndex){
-    printf("Attempting to move object %d from (%d,%d,%d) PotentialMeshCell-> (%d,%d,%d)PotentialMeshCell\n",objectIndex,iOld,jOld,kOld,iNew,jNew,kNew);
+    // printf("Attempting to move object %d from (%d,%d,%d) PotentialMeshCell-> (%d,%d,%d)PotentialMeshCell\n",objectIndex,iOld,jOld,kOld,iNew,jNew,kNew);
     static int numCalls = 0;
     numCalls++;
     object* objects = inputMesh->objects;
@@ -428,23 +474,23 @@ void moveObjectPotential(const int iOld,const  int jOld,const int kOld,const int
     int prior = -1;
 
     // find object in old meshCell
-    for (int i = oldMeshCell->potentialhead; i != -1; i = objects[i].nextPotentialMesh){
+    for (int i = oldMeshCell->head; i != -1; i = objects[i].nextPotentialMesh){
         if (i == objectIndex){
             
             // Remove from old list
-            if (i == oldMeshCell->potentialhead){ // if I is the first entry in the list
-                oldMeshCell->potentialhead = objects[objectIndex].nextPotentialMesh;
+            if (i == oldMeshCell->head){ // if I is the first entry in the list
+                oldMeshCell->head = objects[objectIndex].nextPotentialMesh;
                 // add to new list
-                objects[objectIndex].nextPotentialMesh = newMeshCell->potentialhead;
-                newMeshCell->potentialhead = objectIndex;
+                objects[objectIndex].nextPotentialMesh = newMeshCell->head;
+                newMeshCell->head = objectIndex;
                 
                 return;
             }
             // Remove from old list
             objects[prior].nextPotentialMesh = objects[objectIndex].nextPotentialMesh;
             // Add to new list
-            objects[objectIndex].nextPotentialMesh = newMeshCell->potentialhead;
-            newMeshCell->potentialhead = objectIndex;
+            objects[objectIndex].nextPotentialMesh = newMeshCell->head;
+            newMeshCell->head = objectIndex;
             return;
 
         }
@@ -471,37 +517,43 @@ void periodicBoxBoundary(int obNum, mesh* inputMesh){
     object ob = inputMesh->objects[obNum];
     vec3 pos = ob.pos;
     vec3 vel = ob.vel;
+    if (isnan(vel.x)){
+        vel.x = 0.0;
+    }
+    if (isnan(vel.y)){
+        vel.y = 0.0;
+    }
+    if (isnan(vel.z)){
+        vel.z = 0.0;
+    }
     double width = inputMesh->universeWidth;
-    unsigned char xCheck = (pos.x < 0) || (pos.x > width);
-    unsigned char yCheck = (pos.y < 0) || (pos.y > width);
-    unsigned char zCheck = (pos.z < 0) || (pos.z > width);
-    unsigned char changed = 0;
-    if (pos.x < 0.0){
+    if (pos.x < 0.0 || (isnan(pos.x) && signbit(pos.x))){
         pos.x = width;
         vel.x = -1 * abs(vel.x);
     }
 
-   if (pos.x > width){
+   if (pos.x > width || isnan(pos.x)){
         pos.x = 0.0;
         vel.x =  abs(vel.x);
+        
     }
 
-    if (pos.y < 0.0){
+    if (pos.y < 0.0 || (isnan(pos.y) && signbit(pos.y))){
         pos.y = width;
         vel.y = -1 * abs(vel.y);
     }
 
-   if (pos.y > width){
+   if (pos.y > width || isnan(pos.y)){
         pos.y = 0;
         vel.y =  abs(vel.y);
     }
 
-    if (pos.z < 0.0){
+    if (pos.z < 0.0 || (isnan(pos.x) && signbit(pos.x))){
         pos.z = width;
         vel.z = -1 * abs(vel.z);
     }
 
-   if (pos.z > width){
+   if (pos.z > width || isnan(pos.x)){
         pos.z = 0.0;
         vel.z = abs(vel.z);
     }
@@ -513,9 +565,138 @@ void periodicBoxBoundary(int obNum, mesh* inputMesh){
     
 }
 
+void GreenKSpace(mesh* inputMesh){
+    // Multiply every entry in rho_array by the greens function 1/k^2
+    fftw_complex* rho_array = inputMesh->rho_array;
+    int N = inputMesh->numPotentialMeshCellsPerSideLength;
+    // Iterate over every rho_i
+    for (int i = 0; i < N; i++){
+        for (int j = 0; j < N; j++){
+            for (int k = 0; k < N; k++){
+                fftw_complex* rho_i = indexRhoArray(inputMesh,i,j,k);
+                // Compute there x, y , and z positions
+
+
+                vec3 pos = indexPotentialMesh(inputMesh,i,j,k)->pos;
+                vec3 k;
+            
+                k.x = 2.0*M_PI/pos.x;
+                k.y = 2.0*M_PI/pos.y;
+                k.z = 2.0*M_PI/pos.z;
+                double mag = vec3_mag_squared(k);
+                *rho_i/=mag;
+
+
+            }
+        }
+    }
+}
+
+void longRangeForces(mesh* inputMesh){
+    //TODO: This function
+    // Calculate mass density in each potentialMeshCell and write it to the rho_array
+    meshCell* potentialMeshCells = inputMesh->potentialMeshCells;
+    int numPotentialMeshCells = inputMesh->numPotentialMeshCells;
+    object* objects = inputMesh->objects;
+    for (int i = 0; i < numPotentialMeshCells; i++){
+        // Loop through every object in mesh Cell
+        double totalMassInCell = 0.0;
+        // printPotentialMeshCellObjects(&potentialMeshCells[i],inputMesh);
+        for (int j = potentialMeshCells[i].head; j != -1; j = objects[j].nextPotentialMesh){
+            totalMassInCell += objects[j].mass;
+            if (objects[j].nextPotentialMesh == -1){
+                break;
+            } 
+        }
+        totalMassInCell /= potentialMeshCells[i].volume; // Calculate the mass density
+        // Write to rho_array
+        int iCoord = objects[potentialMeshCells[i].head].iPotential;
+        int jCoord = objects[potentialMeshCells[i].head].jPotential;
+        int kCoord = objects[potentialMeshCells[i].head].kPotential;
+
+        fftw_complex* ijkthDensity = indexRhoArray(inputMesh,iCoord,jCoord,kCoord); 
+        *ijkthDensity = totalMassInCell + 0*I;
+         
+        
+    }
+
+    // Now to fourier transform
+    fftw_execute(inputMesh->plan);
+    // Multiply by Greens function in k space
+    GreenKSpace(inputMesh);
+    // multiply by ik
+    int N = inputMesh->numPotentialMeshCellsPerSideLength;
+    for (int i = 0; i < N; i++){
+        for (int j = 0; j < N; j++){
+            for (int k = 0; k < N; k++){
+                fftw_complex* rho_i = indexRhoArray(inputMesh,i,j,k);
+                // Compute there x, y , and z positions
+
+
+                vec3 pos = indexPotentialMesh(inputMesh,i,j,k)->pos;
+                vec3 ktemp;
+            
+                ktemp.x = 2.0*M_PI/pos.x;
+                ktemp.y = 2.0*M_PI/pos.y;
+                ktemp.z = 2.0*M_PI/pos.z;
+                const double magSquared = vec3_mag_squared(ktemp);
+                const double mag = sqrt(magSquared); 
+                fftw_complex ikx;
+                fftw_complex iky;
+                fftw_complex ikz;
+
+                ikx = 0.0 + ktemp.x*I;
+                iky = 0.0 + ktemp.y*I;
+                ikz = 0.0 + ktemp.z*I;
+                // Create vector of E field in k space at each point
+                int index = indexArray(i,j,k,N); 
+                // TODO: fill ikxArray, ikyArray, and ikzArray  with ik*G*rho
+                const double g = 6.67e-11;
+                const double constant = 4.0*M_PI*g; 
+                inputMesh->kxArray[index] = ikx * *rho_i * constant; 
+                inputMesh->kxArray[index] = iky * *rho_i * constant;
+                inputMesh->kyArray[index] = ikz * *rho_i * constant;
+
+
+            }
+        }
+    }
+
+    fftw_execute(inputMesh->kxplan);
+    fftw_execute(inputMesh->kyplan);
+    fftw_execute(inputMesh->kzplan); // Now kx,ky,and kz contain the Ex, Ey, and Ez components of the field for each cell
+    // Work out acceleration on each particle;
+    for (int i = 0; i < N ; i++){
+        for (int j = 0; j < N; j++){
+            for (int k = 0; k < N; k++){
+                int index = indexArray(i,j,k,N);
+                meshCell* potentialCell = &inputMesh->potentialMeshCells[index];
+                // Calculate field strength at given point
+                vec3 E;
+                E.x = creal(inputMesh->kxArray[index]);
+                E.y = creal(inputMesh->kyArray[index]);
+                E.z = creal(inputMesh->kzArray[index]);
+                //TODO: Interpolate Forces for better accuracy
+                // update acceleration of each particle in cell
+                for (int l = potentialCell->head; l != -1; l = inputMesh->objects[l].nextPotentialMesh){
+                    object* ob = &inputMesh->objects[l];
+                    // E is the acceleration, as F = mE = ma -> a = E
+                    ob->acc = add_vec3(&ob->acc,&E);
+                    if (inputMesh->objects[l].nextPotentialMesh == -1){
+                        break;
+                    } 
+                }
+            }
+        }
+    }
+}
+
 void meshCellLeapFrogStep(mesh* inputMesh, double dt){
     shortRangeForces(inputMesh);
-
+    static int numLongForcesComputes = 0;
+    fprintf(stderr,"Comptuing long range forces for the %d'th time\n",numLongForcesComputes);
+    numLongForcesComputes++;
+    longRangeForces(inputMesh);
     for (int i = 0; i < inputMesh->numObjects; i++){
         vec3 temp = scalar_mul_vec3(dt,&inputMesh->objects[i].acc);
         inputMesh->objects[i].vel = add_vec3(&inputMesh->objects[i].vel,&temp);
