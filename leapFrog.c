@@ -10,10 +10,10 @@
 
 #include <math.h>
 
-#ifndef MPI
-#define MPI
-#include <mpi.h>
-#endif
+//#ifndef MPI
+//#define MPI
+//#include <mpi.h>
+//#endif
 
 vec3 acceleration_and_GPE(object* const inputArray,const unsigned int inputArraySize, const unsigned int ithObject, const double epsilon){
     const double g = 6.67e-11;
@@ -124,6 +124,35 @@ void writeOutputArrayToFile(const object* const restrict outputArray, FILE* file
     for (int step = 0; step < nsteps; step++){
         writeOutputToFile(file,outputArray + n,NUM_OBJECTS);
         n += NUM_OBJECTS;
+    }
+}
+
+void writeOutpuDensityProfileToFile(mesh* inputMesh,FILE* file){
+    double a = inputMesh->potentialCellWidth;
+    double vol = a*a*a;
+    for (int iLoop = 0; iLoop < inputMesh->numPotentialMeshCells; iLoop++){
+       
+
+        // Traverse linked list of cells
+        double containedMass = 0.0;
+        
+        for (int jLoop = inputMesh->potentialMeshCells[iLoop].head; jLoop != -1; jLoop = inputMesh->objects[jLoop].nextPotentialMesh){
+            
+
+            containedMass += inputMesh->objects[jLoop].mass;
+        }
+
+        // containedMass /= vol;
+        if (containedMass > 0.0){
+            printf("Contained mass at %d\n",iLoop);
+        }
+        fprintf(file, "%f,%f,%f,%f,",
+            containedMass,
+            inputMesh->potentialMeshCells[iLoop].pos.x,
+            inputMesh->potentialMeshCells[iLoop].pos.y,
+            inputMesh->potentialMeshCells[iLoop].pos.z
+        );
+        fputc('\n',file);
     }
 }
 

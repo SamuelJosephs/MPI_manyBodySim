@@ -11,25 +11,28 @@ int main(){
     int numObjects = numObjectsPerSideLength * numObjectsPerSideLength * numObjectsPerSideLength;
     object* distribution = uniform(numObjectsPerSideLength,epsilon,dt,universeWidth);
     leapFrogSetup(distribution,numObjects,epsilon,dt);
-    mesh domainMesh = meshFrom(universeWidth/20,universeWidth,10,distribution,numObjects,epsilon);
+    mesh domainMesh = meshFrom(universeWidth/5,universeWidth,10,distribution,numObjects,epsilon);
     FILE* outputFile = fopen("Test_Data.csv","w+");
     printf("Num mesh cells per side length from main = %d\n",domainMesh.numMeshCellsPerSideLength);
     int counter = 0;
     printf("Num Mesh Cells Per side length: %d\n",domainMesh.numMeshCellsPerSideLength);
-    for (int i = 0; i < domainMesh.numMeshCells; i++){
-        printf("Accsessing the %d'th meshCell out of %d\n",i,domainMesh.numMeshCells);
-        printMeshCellObjects(&domainMesh.meshCells[i],&domainMesh);
-        
+    for (int i = 0; i < domainMesh.numPotentialMeshCells; i++){
+        // printf("Accsessing the %d'th meshCell out of %d\n",i,domainMesh.numPotentialMeshCells);
+        // printPotentialMeshCellObjects(&domainMesh.potentialMeshCells[i],&domainMesh);
+        if (domainMesh.potentialMeshCells[i].head != -1){
+            printf("Accsessing the %d'th meshCell out of %d\n",i,domainMesh.numPotentialMeshCells);
+            printPotentialMeshCellObjects(&domainMesh.potentialMeshCells[i],&domainMesh);            
+        }       
     }
     
 
-    for (int i = 0; i < 300; i++){
+    for (int i = 0; i < 100; i++){
         meshCellLeapFrogStep(&domainMesh,dt);
 
 
         if (counter == 10){
             printf("numobjects: %d\n",numObjects);
-            writeOutputToFile(outputFile,distribution,numObjects);
+            writeOutpuDensityProfileToFile(&domainMesh,outputFile);
             counter = 0;
             domainMesh.numIterationsPast++;
         }
@@ -41,6 +44,16 @@ int main(){
     free(domainMesh.meshCells);
     free(distribution);
     fflush(stdout);
+
+    // for (int i = 0; i < domainMesh.numPotentialMeshCells; i++){
+    //     // printf("Accsessing the %d'th meshCell out of %d\n",i,domainMesh.numPotentialMeshCells);
+    //     // printPotentialMeshCellObjects(&domainMesh.potentialMeshCells[i],&domainMesh);
+    //     if (domainMesh.potentialMeshCells[i].head != -1){
+    //         printf("Accsessing the %d'th meshCell out of %d\n",i,domainMesh.numPotentialMeshCells);
+    //         printPotentialMeshCellObjects(&domainMesh.potentialMeshCells[i],&domainMesh);            
+    //     }       
+    // }
+        
     
 
 }

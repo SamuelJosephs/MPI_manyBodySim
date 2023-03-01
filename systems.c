@@ -120,7 +120,7 @@ object* uniform(const int numObjectsPerSideLength,double epsilon, double dt,cons
 				ob.acc = zeroVec;
 				ob.next = -1;
 				ob.nextPotentialMesh = -1;
-				ob.mass = MASS_Earth;
+				ob.mass = 0.00001*MASS_Earth;
 				ob.KE = 0.0;
 				ob.GPE = 0.0;
 				int index = (numObjectsPerSideLength*numObjectsPerSideLength*i + numObjectsPerSideLength*j + k );

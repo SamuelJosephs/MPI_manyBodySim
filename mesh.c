@@ -131,7 +131,12 @@ void assignObjectToPotentialMeshCell(int obNum,mesh* inputMesh,int* iOut, int* j
 void printMeshCellObjects(meshCell* inputCell,mesh* inputMesh){
     
     for (int i = inputCell->head; i != -1; i = inputMesh->objects[i].next){
+        if (i > inputMesh->numObjects){
+            break;
+        }
+        printf("i = %d, next = %d\n",i,inputMesh->objects[i].next);
         printf("%i Index:(%d,%d,%d), ",i,inputMesh->objects[i].i,inputMesh->objects[i].j,inputMesh->objects[i].k);
+        fflush(stdout);
     }
     printf("\nEnd of objects\n");
 }
@@ -139,6 +144,7 @@ void printMeshCellObjects(meshCell* inputCell,mesh* inputMesh){
 void printPotentialMeshCellObjects(const meshCell* inputCell,const mesh* inputMesh){
     
     for (int itemp = inputCell->head; itemp != -1; itemp = inputMesh->objects[itemp].nextPotentialMesh){
+        printf("i = %d, next = %d\n",itemp,inputMesh->objects[itemp].next);
         printf("%i Index:(%d,%d,%d), ",itemp,inputMesh->objects[itemp].i,inputMesh->objects[itemp].j,inputMesh->objects[itemp].k);
     }
     printf("\nEnd of objects\n");
@@ -361,11 +367,17 @@ void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned i
     meshCell* cell = indexMesh(inputMesh,i,j,k);
     int neighbhors[27]; // max neighbhors = 27 = 3**3 
     getNeighbhors(neighbhors,i,j,k,inputMesh);  
+    const double a = inputMesh->potentialCellWidth;
+    const double aSquared = a*a;
     // Loop through every i'th object in cell
     for (int i = cell->head; i != -1; i = inputMesh->objects[i].next){
         vec3 accel = vec3From(0.0,0.0,0.0);
+        vec3 posi = inputMesh->objects[i].pos;
         for (int j = 0; j < 27; j++){
-            if (neighbhors[j] == -1){
+            vec3 posj = inputMesh->objects[j].pos;
+            vec3 seperation = sub_vec3(&posj,&posi);
+            double distance_squared = vec3_mag_squared(seperation);
+            if (neighbhors[j] == -1 || (distance_squared > 0.7*0.7*aSquared)){
                 continue;
             }
             // Calculate forces between i'th object and every neighbhoring cell
@@ -585,6 +597,7 @@ void GreenKSpace(mesh* inputMesh){
                 k.z = 2.0*M_PI/pos.z;
                 double mag = vec3_mag_squared(k);
                 *rho_i/=mag;
+                *rho_i /= (2*M_PI); // normalisation constant from fourier transform
 
 
             }
@@ -692,11 +705,11 @@ void longRangeForces(mesh* inputMesh){
 }
 
 void meshCellLeapFrogStep(mesh* inputMesh, double dt){
-    shortRangeForces(inputMesh);
+    // shortRangeForces(inputMesh);
     static int numLongForcesComputes = 0;
     fprintf(stderr,"Comptuing long range forces for the %d'th time\n",numLongForcesComputes);
     numLongForcesComputes++;
-    longRangeForces(inputMesh);
+    // longRangeForces(inputMesh);
     for (int i = 0; i < inputMesh->numObjects; i++){
         vec3 temp = scalar_mul_vec3(dt,&inputMesh->objects[i].acc);
         inputMesh->objects[i].vel = add_vec3(&inputMesh->objects[i].vel,&temp);
