@@ -280,8 +280,71 @@ void assignCharge(mesh* inputMesh){
     }
 }
 
+double K(int i, int N){
+    return 2.0*M_PI*((double) i / (double)N);
+}
+
+void D(double ki,double kj,double kk,fftw_complex* di, fftw_complex* dj, fftw_complex* dk, double H,double alpha){
+    *di = I*alpha*sin(ki*H)/H + I*(1-alpha)*sin(2.0*ki*H)/(2.0*H);
+    *dj = I*alpha*sin(kj*H)/H + I*(1-alpha)*sin(2.0*kj*H)/(2.0*H);
+    *dk = I*alpha*sin(kk*H)/H + I*(1-alpha)*sin(2.0*kk*H)/(2.0*H);
+}
+
+
+// NGP: p = 0, CIC: p = 1, TSC: p = 2
+fftw_complex U(fftw_complex kx, fftw_complex ky, fftw_complex kz, double H, double p){
+    double Hcubed = H*H*H;
+    fftw_complex a = csin(kx*H/2.0)/(kx*H/2.0);
+    fftw_complex b = csin(ky*H/2.0)/(ky*H/2.0);
+    fftw_complex c = csin(kz*H/2.0)/(kz*H/2.0);
+    return cpow(a*b*c,p+1.0);
+    
+}
+
+fftw_complex USquared(fftw_complex kx, fftw_complex ky, fftw_complex kz,double H){
+    fftw_complex a = 1.0 - cpow(csin(kx*H/2.0),2.0) + (2.0/15.0)*cpow(csin(kx*H/2.0),4.0);
+    fftw_complex b = 1.0 - cpow(csin(ky*H/2.0),2.0) + (2.0/15.0)*cpow(csin(ky*H/2.0),4.0);
+    fftw_complex c = 1.0 - cpow(csin(kz*H/2.0),2.0) + (2.0/15.0)*cpow(csin(kz*H/2.0),4.0);
+    return a*b*c;
+
+}
+
+double SkSpace(double k, double a){
+   return (12.0/pow((k*a/2.0),4.0))*(2.0-2.0*cos(k*a/2.0)-(k*a/2.0)*sin(k*a/2.0))
+}
+
+void RkSpace(double kx, double ky, double kz, double a,fftw_complex* Rx, fftw_complex* Ry, fftw_complex* Rz){
+    double kSquared = kx*kx + ky*ky + kz*kz;
+    double k = sqrt(kSquared);
+    double s = SkSpace(k,a);
+    double sSquared = s*s;
+    double product = -sSquared / kSquared;
+    *Rx = -I*kx*product;
+    *Ry = -I*ky*product;
+    *Rz = -I*kz*product; 
+}
+
+void GkSpace(double p, double H, double alpha, fftw_complex* outputArray, int outputArrayLength ){
+    for (int i = 0; i < outputArrayLength; i++){
+        for (int j = 0; j < outputArrayLength; j++){
+            for (int k = 0; k < outputArrayLength; k++){
+                double kx = K(i,outputArrayLength);
+                double ky = K(j,outputArrayLength);
+                double kz = K(k,outputArrayLength);
+                fftw_complex dx;
+                fftw_complex dy;
+                fftw_complex dz;
+                D(kx,ky,kz,&dx,&dy,&dz,H,alpha);
+                //TODO: compute proper greens function and write to outputArray, it will be used in all future calculations and only needs to be computed once.
+            }
+        }
+    }
+}
+
+
 
 void longRangeForces(mesh* inputMesh){
-   fftw_execute(inputMesh->rhoPlanForward); 
+   fftw_execute(inputMesh->rhoPlanForward);
+    
 }
 
