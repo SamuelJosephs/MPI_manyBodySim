@@ -57,104 +57,47 @@ int indexArray(int i, int j, int k, int N){
     return ((N*N*i) + N*j + k); // row major order for fftw
 }
 
-void assignObjectToMeshCell(int obNum,mesh* inputMesh,int* iOut, int* jOut, int* kOut){
-    // Work out fraction across x,y, and z axis
-    object ob = inputMesh->objects[obNum];
-    double width = inputMesh->universeWidth;
-    int numCells = inputMesh->numChainMeshCellsPerSideLength;
-    double fracX = ob.pos.x / width;
-    double fracY = ob.pos.y / width;
-    double fracZ = ob.pos.z / width;
-
-    // Use this to work out where it should be in the Mesh
-    int i = (int)(fracX * (double)numCells -0.5);
-    int j = (int)(fracY * (double)numCells - 0.5);
-    int k = (int)(fracZ * (double)numCells - 0.5);
-
-    if (iOut != NULL || jOut != NULL || kOut != NULL){
-        *iOut = i;
-        *jOut = j;
-        *kOut = k;
-        
-        return;
-    }
-    int index = indexArray(i,j,k,inputMesh->numChainMeshCellsPerSideLength);
-    meshCell* cell = &inputMesh->chainMeshCells[index];
-    // Prepend to linked list in Cell
-    inputMesh->objects[obNum].next = cell->head;
-    cell->head = obNum;
-    if (cell->head == inputMesh->objects[cell->head].next){
-        fprintf(stderr,"cell->head = objects[cell->head].next, this will result in an infite loop when traversing the list\n");
-    }
-}
 
 
-void assignObjectToPotentialMeshCell(int obNum,mesh* inputMesh,int* iOut, int* jOut, int* kOut){
-    // Work out fraction across x,y, and z axis
-    object ob = inputMesh->objects[obNum];
-    double width = inputMesh->universeWidth;
-    int numCells = inputMesh->numPotentialMeshCellsPerSideLength;
-    double fracX = ob.pos.x / width;
-    double fracY = ob.pos.y / width;
-    double fracZ = ob.pos.z / width;
-
-    // Use this to work out where it should be in the Mesh
-    int i = (int)(fracX * (double)numCells -0.5);
-    int j = (int)(fracY * (double)numCells - 0.5);
-    int k = (int)(fracZ * (double)numCells - 0.5);
-
-    if (iOut != NULL || jOut != NULL || kOut != NULL){
-        *iOut = i;
-        *jOut = j;
-        *kOut = k;
-        
-        return;
-    }
-    int index = indexArray(i,j,k,inputMesh->numPotentialMeshCellsPerSideLength);
-    meshCell* cell = &inputMesh->potentialMeshCells[index];
-    // Prepend to linked list in Cell
-    fprintf(stderr, "Potential: Cell Head = %d, next: %d\n",cell->head,inputMesh->objects[cell->head].nextPotentialMesh);
-    inputMesh->objects[obNum].nextPotentialMesh = cell->head;
-    cell->head = obNum;
-    if (cell->head == inputMesh->objects[obNum].nextPotentialMesh){
-        fprintf(stderr,"Potential: Cell head == obnum.nextPotentialMesh, %d,%d This will cause an infinite loop\n",cell->head,inputMesh->objects[obNum].nextPotentialMesh);
-        // exit(1);
-    }
-}
-
-void calcIndex(double x, double y, double z, int numPerSide, int* i, int* j, int* k, mesh* inputMesh){
-    double width = inputMesh->universeWidth;
-    double fracX = x / width;
-    double fracY = y / width;
-    double fracZ = z / width;
-    int iTemp = (int)(fracX * (double)numPerSide -0.5);
-    int jTemp = (int)(fracY * (double)numPerSide - 0.5);
-    int kTemp = (int)(fracZ * (double)numPerSide - 0.5);
-    *i = iTemp;
-    *j = jTemp;
-    *k = kTemp;    
+void prependObjectToChainMeshCell(meshCell* cell, int obnum, mesh* inputMesh){
+    inputMesh->objects[obnum].next = cell->head;
+    cell->head = obnum;
     return;
 }
-
+void prependObjectToPotentialMeshCell(meshCell* cell, int obnum, mesh* inputMesh){
+    inputMesh->objects[obnum].nextPotentialMesh = cell->head;
+    cell->head = obnum;
+    return;
+}
 void assignObjectsToMesh(object* objects,const unsigned int numObjects, mesh* inputMesh){
-    for (int i = 0; i < numObjects; i++){
-        int iPos;
-        int kPos;
-        int jPos;
-        assignObjectToMeshCell(i,inputMesh,&iPos,&jPos,&kPos);
-        objects[i].i = iPos;
-        objects[i].j = jPos;
-        objects[i].k = kPos;
-        assignObjectToMeshCell(i,inputMesh,NULL,NULL,NULL);
 
-        int iPosPotential;
-        int jPosPotential;
-        int kPosPotential;
-        assignObjectToPotentialMeshCell(i,inputMesh,&iPosPotential,&jPosPotential,&kPosPotential);
-        objects[i].iPotential = iPosPotential;
-        objects[i].jPotential = jPosPotential;
-        objects[i].kPotential = kPosPotential;
-        assignObjectToPotentialMeshCell(i,inputMesh,NULL,NULL,NULL);
+    // First do a pass initialising all chainMeshCells and potentialMeshCells heads to be -1
+
+    for (int i = 0; i < inputMesh->numChainMeshCells; i++){
+        inputMesh->chainMeshCells[i].head = -1;
+    }
+
+    for (int i = 0; i < inputMesh->numPotentialMeshCells; i++){
+        inputMesh->potentialMeshCells[i].head = -1;
+    }
+
+    for (int i = 0; i < numObjects; i++){
+        int iChainPos = (int)(objects[i].pos.x / inputMesh->chainCellWidth);
+        int iPotentialPos =(int)(objects[i].pos.x / inputMesh->potentialCellWidth);
+        int jChainPos = (int)(objects[i].pos.y / inputMesh->chainCellWidth);
+        int jPotentialPos = (int)(objects[i].pos.y / inputMesh->potentialCellWidth);
+        int kChainPos = (int)(objects[i].pos.z / inputMesh->chainCellWidth);
+        int kPotentialPos = (int)(objects[i].pos.z / inputMesh->potentialCellWidth);
+
+        int chainIndex = indexArray(iChainPos,jChainPos,kChainPos,inputMesh->numChainMeshCellsPerSideLength);
+        int potentialIndex = indexArray(iPotentialPos,jPotentialPos,kPotentialPos,inputMesh->numPotentialMeshCellsPerSideLength);
+
+        meshCell* chainMeshCell = &inputMesh->chainMeshCells[chainIndex];
+        meshCell* potentialMeshCell = &inputMesh->potentialMeshCells[potentialIndex];
+
+        prependObjectToChainMeshCell(chainMeshCell,i,inputMesh);
+        prependObjectToPotentialMeshCell(potentialMeshCell,i,inputMesh);
+
 
     }
     
@@ -242,6 +185,46 @@ mesh meshFrom(object* objects, int numObjects, double universeWidth, double G, i
 
 }
 
+void getPotentialNeighbhors(int* inputArray, const int i, const int j, const int k, mesh* inputMesh){
+    int counter = 0;
+    const int numCells = inputMesh->numPotentialMeshCellsPerSideLength;
+    
+    for (int iLoop = -1; iLoop < 2; iLoop++){
+         for (int jLoop = -1; jLoop < 2; jLoop++){
+            for (int kLoop = -1; kLoop < 2; kLoop++){ // This gives the correct number of 
+                
+                // Logic goes here
+                
+                const int newI = i + iLoop;
+                const int newJ = j + jLoop;
+                const int newK = k + kLoop;
+                // // Check that the new i,j,k's are valid
+                
+                const unsigned char iNotValid = (newI >= numCells) || (newI < 0);
+                const unsigned char jNotValid = (newJ >= numCells) || (newJ < 0);
+                const unsigned char kNotValid = (newK >= numCells) || (newK < 0);
+                if (iNotValid || jNotValid || kNotValid){
+                    inputArray[counter] = -1;
+                    counter++;
+                    continue;
+                }
+
+                int index = indexArray(newI,newJ,newK,numCells);
+                meshCell* temp = &inputMesh->potentialMeshCells[index];
+                const int head = temp->head;
+ 
+                fflush(stdout);
+                inputArray[counter] = head;
+                
+                // and ends before here
+                counter++;
+
+                
+        
+            }
+        }   
+    }
+}
 
 double CICw(double x,double x_p,double H){
     double difference = abs(x-x_p);
@@ -256,4 +239,49 @@ double CICW(double x, double xp, double y, double yp, double z, double zp, doubl
     return CICw(x,xp,H) * CICw(y,yp,H) * CICw(z,zp,H);
 }
 
+void assignCharge(mesh* inputMesh){
+    int neighbhors[27];
+    int N = inputMesh->numPotentialMeshCellsPerSideLength;
+    int H = inputMesh->potentialCellWidth;
+    for (int iLoop = 0; iLoop < N; iLoop++){
+        for (int jLoop = 0; jLoop < N; jLoop++){
+            for (int kLoop = 0; kLoop < N; kLoop++){
+                getPotentialNeighbhors(neighbhors,iLoop,jLoop,kLoop,inputMesh);
+                // Loop through every object in neighbhors, then convolve with window function to assign charge
+                int meshCellIndex = indexArray(iLoop,jLoop,kLoop,N);
+                meshCell* cell = &inputMesh->potentialMeshCells[meshCellIndex];
+                double xp = cell->pos.x;
+                double yp = cell->pos.y;
+                double zp = cell->pos.z;
+                double rho = 0.0;
+                for (int neighbhor = 0; neighbhor < 27; neighbhor++){
+                    int head = neighbhors[neighbhor];
+                    if (head == -1){
+                        continue;
+                    }
+
+                    // Now loop through objects in chain
+                    for (int c = head; c != -1; c = inputMesh->objects[c].nextPotentialMesh){
+                        object* ob = &inputMesh->objects[c];
+                        double x = ob->pos.x;
+                        double y = ob->pos.y;
+                        double z = ob->pos.z;
+                        rho += CICW(x,xp,y,yp,z,zp,H);
+                        
+                    }
+                    
+                }
+
+                rho /= cell->volume;
+                // write rho to rho_array
+                inputMesh->rho_array[meshCellIndex] = rho;
+            }
+        }
+    }
+}
+
+
+void longRangeForces(mesh* inputMesh){
+   fftw_execute(inputMesh->rhoPlanForward); 
+}
 

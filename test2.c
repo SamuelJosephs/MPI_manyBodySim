@@ -10,5 +10,7 @@ double g = 6.67e-11;
 int main(int argc, char** argv){
     object* objects = uniform(10,epsilon,dt,universeWidth);
     mesh test = meshFrom(objects,numObjects,universeWidth,g,10,5);
+    assignCharge(&test);
+    longRangeForces(&test);
     printf("Succsess!");
 }
