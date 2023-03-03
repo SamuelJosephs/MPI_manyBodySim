@@ -16,7 +16,7 @@ int main(int argc, char** argv){
     
     scanGarrayForNan(&test);
     FILE* output = fopen("Test2_data.csv","w+");
-    for (int i = 0; i < 100; i++){
+    for (int i = 0; i < 200; i++){
         periodicBox(&test,0.5*test.potentialCellWidth);
         assignObjectsToMesh(objects,&test);
         // printAllPotentialMeshCellObjects(&test);
