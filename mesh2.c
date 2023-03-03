@@ -397,7 +397,7 @@ void RkSpace(double kx, double ky, double kz, double a,fftw_complex* Rx, fftw_co
     return;
 }
 
-void GkSpace(double p, double H, double alpha, double* outputArray, int outputArrayLength,mesh* inputMesh ){
+void GkSpace(double p, double H, double alpha,double a, double* outputArray, int outputArrayLength,mesh* inputMesh ){
     printf("Computing G(k)\n");
     // Compute D(k)
     fftw_complex dx;
@@ -423,7 +423,7 @@ void GkSpace(double p, double H, double alpha, double* outputArray, int outputAr
 
                 // Compute U^2(k_n)R(K)
                 complex double rx, ry, rz;
-                RkSpace(kx,ky,kz,alpha,&rx,&ry,&rz);
+                RkSpace(kx,ky,kz,a,&rx,&ry,&rz);
                 // printf("rx,ry,rz = %f + %f I, %f + %f I, %f + %f I\n",creal(rx),cimag(rx),creal(ry),cimag(ry),creal(rz),cimag(rz));
                 if (isnan(creal(rx)) || isnan(cimag(rx)) || isnan(creal(ry)) || isnan(cimag(ry))|| isnan(creal(rz)) || isnan(cimag(rz))){
                     printf("rx real: %f,rx imag: %f, ry real: %f, ry imag: %f, rz real: %f, rz imgag:%f\n",creal(rx),cimag(rx),creal(ry),cimag(ry),creal(rz),cimag(rz) );
@@ -554,9 +554,9 @@ void longRangeForces(mesh* inputMesh,double dt){
         for (int jLoop = 0; jLoop < N; jLoop++){
             for (int kLoop = 0; kLoop < N; kLoop++){
                 const int index = indexArray(iLoop,jLoop,kLoop,N);
-                const double fx = -1.0*(rho_array[iLoop] - rho_array[iLoop - 1]) /H; // - grad phi 
-                const double fy = -1.0*(rho_array[jLoop] - rho_array[jLoop - 1]) /H; 
-                const double fz = -1.0*(rho_array[kLoop] - rho_array[kLoop - 1]) /H; 
+                const double fx = (rho_array[iLoop] - rho_array[iLoop - 1]) /H; // - grad phi 
+                const double fy = (rho_array[jLoop] - rho_array[jLoop - 1]) /H; 
+                const double fz = (rho_array[kLoop] - rho_array[kLoop - 1]) /H; 
                 inputMesh->potentialMeshCells[index].fx = fx;
                 inputMesh->potentialMeshCells[index].fy = fy;
                 inputMesh->potentialMeshCells[index].fz = fz;
@@ -586,10 +586,7 @@ void longRangeForces(mesh* inputMesh,double dt){
                         meshcellfx *= CICW(meshCellPos.x,objectPos.x,meshCellPos.y,objectPos.y,meshCellPos.z,objectPos.z,H);
                         meshcellfy *= CICW(meshCellPos.x,objectPos.x,meshCellPos.y,objectPos.y,meshCellPos.z,objectPos.z,H);
                         meshcellfz *= CICW(meshCellPos.x,objectPos.x,meshCellPos.y,objectPos.y,meshCellPos.z,objectPos.z,H);
-                        if (cabs(meshcellfx) > 0.0 || cabs(meshcellfy) > 0.0 || cabs(meshcellfz) > 0.0){
-                            printf("(fx,fy,fz) = %f,%f,%f | num times called = %d\n",meshcellfx,meshcellfy,meshcellfz,numTimesCalled); 
-
-                        }         
+ 
                         obForce.x += meshcellfx;
                         obForce.y += meshcellfy;
                         obForce.z += meshcellfz;
@@ -597,8 +594,11 @@ void longRangeForces(mesh* inputMesh,double dt){
                         
                     }
                     // obForce = scalar_mul_vec3(1.0/inputMesh->objects[obnum].mass,&obForce);
-                    inputMesh->objects[obnum].acc = obForce;
-                    // Now do Euler step on object
+                    inputMesh->objects[obnum].acc = add_vec3(&obForce,&inputMesh->objects[obnum].acc);
+                    
+                    printf("(fx,fy,fz) = %f,%f,%f | num times called = %d\n",obForce.x,obForce.y,obForce.z,numTimesCalled); 
+    
+                                                // Now do Euler step on object
                     vec3 newVel = scalar_mul_vec3(dt,&obForce);
                     newVel = add_vec3(&newVel,&inputMesh->objects[obnum].vel);
                     vec3 newPos = scalar_mul_vec3(dt,&newVel);
@@ -651,3 +651,81 @@ void periodicBox(mesh* inputMesh,double offset){
 
 }
 
+vec3 accelerationBetweenObjects(mesh* inputMesh, int A, int B){
+    // const double g = 6.67e-11;
+    const double g = 1.0 / (4*M_PI);
+    const double epsilon = inputMesh->epsilon;
+    // vec3 outputAcc = inputMesh->objects[A].acc;
+    vec3 outputAcc = vec3From(0.0,0.0,0.0);
+    const vec3 iPos = inputMesh->objects[A].pos;
+   
+
+    const vec3 jPos = inputMesh->objects[B].pos;
+    const double jMass = inputMesh->objects[B].mass;
+
+    const vec3 seperation = sub_vec3(&jPos,&iPos); // Should be the other way round but more computationally efficient to encode the minus sign here
+    const double acc_mul = (g * jMass) / sqrt(pow(vec3_mag_squared(seperation) + epsilon*epsilon,3.0));
+    const vec3 acc_mul_sep = scalar_mul_vec3(acc_mul,&seperation);
+    outputAcc = add_vec3(&outputAcc,&acc_mul_sep);
+    // return outputAcc;
+    return acc_mul_sep;
+}
+
+void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned int j,const unsigned int k ){
+    int index = indexArray(i,j,k,inputMesh->numChainMeshCellsPerSideLength);
+    // meshCell* cell = indexArray(i,j,k,inputMesh->numPotentialMeshCellsPerSideLength);
+    meshCell* cell = &inputMesh->chainMeshCells[index];
+    int neighbhors[27]; // max neighbhors = 27 = 3**3 
+    getPotentialNeighbhors(neighbhors,i,j,k,inputMesh);  
+    const double a = 0.7*inputMesh->chainCellWidth;
+    const double aSquared = a*a;
+    // Loop through every i'th object in cell
+    for (int i = cell->head; i != -1; i = inputMesh->objects[i].next){
+        vec3 accel = vec3From(0.0,0.0,0.0);
+        vec3 posi = inputMesh->objects[i].pos;
+        for (int j = 0; j < 27; j++){
+            if (neighbhors[j] == -1){
+                continue;
+            }           
+            // Calculate forces between i'th object and every neighbhoring cell
+            for (int k = neighbhors[j]; k != -1; k = inputMesh->objects[k].next){
+                vec3 posj = inputMesh->objects[k].pos;
+                vec3 sep = sub_vec3(&posj,&posi);
+                double magSquared = vec3_mag_squared(sep);
+                if (magSquared > aSquared){
+                    continue;
+                }
+                vec3 temp = accelerationBetweenObjects(inputMesh,i,k);
+                accel = add_vec3(&accel,&temp);
+                if (inputMesh->objects[k].next == -1){
+                    break;
+                }
+            }
+
+        }
+        inputMesh->objects[i].acc = accel;
+    }
+
+ 
+}
+
+void shortRangeForces(mesh* inputMesh){
+    /* 
+    1) Loop through every cell
+    2) Check if each cell is on the edge or not and account for out of bound reads
+    3) Otherwise Loop through every neighboring cell to take into account short range forces from them
+    */
+
+   const unsigned int maxCount = inputMesh->numChainMeshCellsPerSideLength;
+   for (int i = 0; i < maxCount; i++){
+        for (int j = 0; j < maxCount; j++){
+            for (int k = 0; k < maxCount; k++){
+                
+                accelerationFromCell(inputMesh,i,j,k); // Does 2 and 3 lol
+
+            }
+        }
+   }
+
+
+}
