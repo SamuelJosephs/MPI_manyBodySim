@@ -157,8 +157,10 @@ void assignPotentialMeshCellsPositions(mesh* inputMesh){
 
 
 
-mesh meshFrom(object* objects, int numObjects, double universeWidth, double G, int numChainMeshCellsPerSideLength, int numPotentialMeshCellsPerChainCell){
+mesh meshFrom(object* objects, int numObjects, double universeWidth, double G, int numChainMeshCellsPerSideLength, int numPotentialMeshCellsPerChainCell,double epsilon
+){
     mesh output;
+    output.epsilon = epsilon;
     output.objects = objects;
     output.numObjects = numObjects;
     output.numChainMeshCellsPerSideLength = numChainMeshCellsPerSideLength;
@@ -599,7 +601,8 @@ void longRangeForces(mesh* inputMesh,double dt){
                     printf("(fx,fy,fz) = %f,%f,%f | num times called = %d\n",obForce.x,obForce.y,obForce.z,numTimesCalled); 
     
                                                 // Now do Euler step on object
-                    vec3 newVel = scalar_mul_vec3(dt,&obForce);
+                    // vec3 newVel = scalar_mul_vec3(dt,&obForce);
+                    vec3 newVel = scalar_mul_vec3(dt,&inputMesh->objects[obnum].acc);
                     newVel = add_vec3(&newVel,&inputMesh->objects[obnum].vel);
                     vec3 newPos = scalar_mul_vec3(dt,&newVel);
                     newPos = add_vec3(&newPos,&inputMesh->objects[obnum].pos); 
