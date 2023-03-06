@@ -167,7 +167,7 @@ mesh meshFrom(object* objects, int numObjects, double universeWidth, double G, i
     output.numPotentialMeshCellsPerSideLength = output.numChainMeshCellsPerSideLength * numPotentialMeshCellsPerChainCell;
     output.universeWidth = universeWidth;
     output.chainCellWidth = universeWidth / (double) numChainMeshCellsPerSideLength;
-    output.potentialCellWidth = output.chainCellWidth / numPotentialMeshCellsPerChainCell;
+    output.potentialCellWidth = universeWidth / output.numPotentialMeshCellsPerSideLength;
     output.G = G;
 
     output.numChainMeshCells = output.numChainMeshCellsPerSideLength *  output.numChainMeshCellsPerSideLength *  output.numChainMeshCellsPerSideLength;
@@ -348,11 +348,11 @@ void checkIfRhoArrayIsZero(mesh* inputMesh,int count){
         printf("Rho Array is zero on count: %d\n",count);
     }
 }
-double K(int i, int N){
+double K(int i, mesh* inputMesh){
     if (i == 0){
         return 2*M_PI;
     }
-    return 2.0*M_PI*((double) i / (double)N);
+    return 2.0*M_PI*((double) i / inputMesh->universeWidth);
 }
 
 void D(double ki,double kj,double kk,fftw_complex* di, fftw_complex* dj, fftw_complex* dk, double H,double alpha){
@@ -413,9 +413,9 @@ void GkSpace(double p, double H, double alpha,double a, double* outputArray, int
     for (int iLoop = 0; iLoop < N; iLoop++){
         for (int jLoop = 0; jLoop < N; jLoop++){
             for (int kLoop = 0; kLoop < N; kLoop++){
-                const double kx = K(iLoop,N);
-                const double ky = K(jLoop,N);
-                const double kz = K(jLoop,N);
+                const double kx = K(iLoop,inputMesh);
+                const double ky = K(jLoop,inputMesh);
+                const double kz = K(kLoop,inputMesh);
                 if (isnan(kx) || isnan(ky) || isnan(kz)){
                     exit(2);
                 }
@@ -455,9 +455,9 @@ void GkSpace(double p, double H, double alpha,double a, double* outputArray, int
     for (int iLoop = 0; iLoop < N; iLoop++){
         for (int jLoop = 0; jLoop < N; jLoop++){
             for (int kLoop = 0; kLoop < N; kLoop++){
-                const double kx = K(iLoop,N);
-                const double ky = K(jLoop,N);
-                const double kz = K(kLoop,N);
+                const double kx = K(iLoop,inputMesh);
+                const double ky = K(jLoop,inputMesh);
+                const double kz = K(kLoop,inputMesh);
                 complex double dx;
                 complex double dy;
                 complex double dz;
@@ -595,7 +595,7 @@ void longRangeForces(mesh* inputMesh,double dt){
                            
                         
                     }
-                    // obForce = scalar_mul_vec3(1.0/inputMesh->objects[obnum].mass,&obForce);
+                    obForce = scalar_mul_vec3(1.0/inputMesh->objects[obnum].mass,&obForce); // Work out acceleration
                     inputMesh->objects[obnum].acc = add_vec3(&obForce,&inputMesh->objects[obnum].acc);
                     
                     printf("(fx,fy,fz) = %f,%f,%f | num times called = %d\n",obForce.x,obForce.y,obForce.z,numTimesCalled); 

@@ -111,16 +111,16 @@ object* uniform(const int numObjectsPerSideLength,double epsilon, double dt,cons
 			for (int k = 0; k < numObjectsPerSideLength; k++){
 				// Work out position of object
 				vec3 pos;
-				pos.x = (double) i * (universeWidth / (double) numObjectsPerSideLength);
-				pos.y = (double) j * (universeWidth / (double) numObjectsPerSideLength);
-				pos.z = (double) k * (universeWidth / (double) numObjectsPerSideLength);
+				pos.x = (double) i * (universeWidth / (double) numObjectsPerSideLength) + ((double)rand()/RAND_MAX  * 1e-2 * universeWidth );
+				pos.y = (double) j * (universeWidth / (double) numObjectsPerSideLength) + ((double)rand()/RAND_MAX  * 1e-2 * universeWidth );
+				pos.z = (double) k * (universeWidth / (double) numObjectsPerSideLength) + ((double)rand()/RAND_MAX  * 1e-2 * universeWidth );
 				object ob;
 				ob.pos = pos;
 				ob.vel = zeroVec;
 				ob.acc = zeroVec;
 				ob.next = -1;
 				ob.nextPotentialMesh = -1;
-				ob.mass = 0.00001*MASS_Earth;
+				ob.mass = 1e4;
 				ob.KE = 0.0;
 				ob.GPE = 0.0;
 				int index = (numObjectsPerSideLength*numObjectsPerSideLength*i + numObjectsPerSideLength*j + k );
