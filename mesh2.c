@@ -125,9 +125,9 @@ void assignChainMeshCellsPositions(mesh* inputMesh){
     for (int iLoop = 0; iLoop < N; iLoop++){
         for (int jLoop = 0; jLoop < N; jLoop++){
             for (int kLoop = 0; kLoop < N; kLoop++){
-                double xPos = iLoop * (inputMesh->universeWidth / inputMesh->numChainMeshCellsPerSideLength) - 0.5 * inputMesh->chainCellWidth;
-                double yPos = jLoop * (inputMesh->universeWidth / inputMesh->numChainMeshCellsPerSideLength) - 0.5 * inputMesh->chainCellWidth;
-                double zPos = kLoop * (inputMesh->universeWidth / inputMesh->numChainMeshCellsPerSideLength) - 0.5 * inputMesh->chainCellWidth;
+                double xPos = iLoop * (inputMesh->universeWidth / (double) inputMesh->numChainMeshCellsPerSideLength) + 0.5 * inputMesh->chainCellWidth;
+                double yPos = jLoop * (inputMesh->universeWidth / (double) inputMesh->numChainMeshCellsPerSideLength) + 0.5 * inputMesh->chainCellWidth;
+                double zPos = kLoop * (inputMesh->universeWidth / (double) inputMesh->numChainMeshCellsPerSideLength) + 0.5 * inputMesh->chainCellWidth;
                 int index = indexArray(iLoop,jLoop,kLoop,N);
                 inputMesh->chainMeshCells[index].pos.x = xPos;
                 inputMesh->chainMeshCells[index].pos.y = yPos;
@@ -142,9 +142,9 @@ void assignPotentialMeshCellsPositions(mesh* inputMesh){
     for (int iLoop = 0; iLoop < N; iLoop++){
         for (int jLoop = 0; jLoop < N; jLoop++){
             for (int kLoop = 0; kLoop < N; kLoop++){
-                double xPos = iLoop * (inputMesh->universeWidth / inputMesh->numPotentialMeshCellsPerSideLength) - 0.5 * inputMesh->potentialCellWidth;
-                double yPos = jLoop * (inputMesh->universeWidth / inputMesh->numPotentialMeshCellsPerSideLength) - 0.5 * inputMesh->potentialCellWidth;
-                double zPos = kLoop * (inputMesh->universeWidth / inputMesh->numPotentialMeshCellsPerSideLength) - 0.5 * inputMesh->potentialCellWidth;
+                double xPos = iLoop * (inputMesh->universeWidth / (double) inputMesh->numPotentialMeshCellsPerSideLength) + 0.5 * inputMesh->potentialCellWidth;
+                double yPos = jLoop * (inputMesh->universeWidth / (double) inputMesh->numPotentialMeshCellsPerSideLength) + 0.5 * inputMesh->potentialCellWidth;
+                double zPos = kLoop * (inputMesh->universeWidth / (double) inputMesh->numPotentialMeshCellsPerSideLength) + 0.5 * inputMesh->potentialCellWidth;
                 int index = indexArray(iLoop,jLoop,kLoop,N);
                 inputMesh->potentialMeshCells[index].pos.x = xPos;
                 inputMesh->potentialMeshCells[index].pos.y = yPos;
@@ -285,10 +285,17 @@ void getPotentialNeighbhorPotentialCells(int* inputArray, const int i, const int
 }
 double CICw(double x,double x_p,double H){
     double difference = abs(x-x_p);
-    if (difference > H){
-        return 0.0;
+    // if (difference > H){
+    //     return 0.0;
+    // }
+    // return 1.0 - (difference / H);
+    if (difference <= H/2.0){
+        return 3.0/4.0 - ((difference/H)*(difference/H));
     }
-    return 1.0 - (difference / H);
+    if (difference <= 3.0*H/2.0){
+        return 0.5*(3.0/2.0 - difference/H)*(3.0/2.0-difference/H);
+    }
+    return 0.0;
 
 }
 
@@ -352,13 +359,16 @@ double K(int i, mesh* inputMesh){
     if (i == 0){
         return 2*M_PI;
     }
+    if (inputMesh->universeWidth == 0.0){
+        printf("Universe width is 0\n");
+    }
     return 2.0*M_PI*((double) i / inputMesh->universeWidth);
 }
 
 void D(double ki,double kj,double kk,fftw_complex* di, fftw_complex* dj, fftw_complex* dk, double H,double alpha){
-    *di = I*alpha*sin(ki*H)/H + I*(1-alpha)*sin(2.0*ki*H)/(2.0*H);
-    *dj = I*alpha*sin(kj*H)/H + I*(1-alpha)*sin(2.0*kj*H)/(2.0*H);
-    *dk = I*alpha*sin(kk*H)/H + I*(1-alpha)*sin(2.0*kk*H)/(2.0*H);
+    *di = I*alpha*sin(ki*H)/H + I*(1.0-alpha)*sin(2.0*ki*H)/(2.0*H);
+    *dj = I*alpha*sin(kj*H)/H + I*(1.0-alpha)*sin(2.0*kj*H)/(2.0*H);
+    *dk = I*alpha*sin(kk*H)/H + I*(1.0-alpha)*sin(2.0*kk*H)/(2.0*H);
     return;
 }
 
@@ -402,9 +412,9 @@ void RkSpace(double kx, double ky, double kz, double a,fftw_complex* Rx, fftw_co
 void GkSpace(double p, double H, double alpha,double a, double* outputArray, int outputArrayLength,mesh* inputMesh ){
     printf("Computing G(k)\n");
     // Compute D(k)
-    fftw_complex dx;
-    fftw_complex dy;
-    fftw_complex dz;
+    // fftw_complex dx;
+    // fftw_complex dy;
+    // fftw_complex dz;
     complex double sumProductX = 0.0 + 0.0*I;
     complex double sumProductY = 0.0 + 0.0*I;
     complex double sumProductZ = 0.0 + 0.0*I;
@@ -417,6 +427,8 @@ void GkSpace(double p, double H, double alpha,double a, double* outputArray, int
                 const double ky = K(jLoop,inputMesh);
                 const double kz = K(kLoop,inputMesh);
                 if (isnan(kx) || isnan(ky) || isnan(kz)){
+                    fprintf(stderr,"k is nan\n");
+                    fflush(stderr);
                     exit(2);
                 }
 
@@ -430,10 +442,12 @@ void GkSpace(double p, double H, double alpha,double a, double* outputArray, int
                 if (isnan(creal(rx)) || isnan(cimag(rx)) || isnan(creal(ry)) || isnan(cimag(ry))|| isnan(creal(rz)) || isnan(cimag(rz))){
                     printf("rx real: %f,rx imag: %f, ry real: %f, ry imag: %f, rz real: %f, rz imgag:%f\n",creal(rx),cimag(rx),creal(ry),cimag(ry),creal(rz),cimag(rz) );
                     printf("(kx,ky,kz) = (%f,%f,%f)\n",kx,ky,kz);
+                    fflush(stdout);
                     exit(3);
                 }
                 const complex double usquared = USquared(kx,ky,kz,H);
                  if (isnan(creal(usquared)) || isnan(cimag(usquared)) || isnan(creal(usquared)) || isnan(cimag(usquared))|| isnan(creal(usquared)) || isnan(cimag(usquared))){
+                    fprintf(stderr,"usquared is nan\n");
                     exit(4);
                 }              
                 const complex double sumProdTempx = usquared * rx;
@@ -463,14 +477,18 @@ void GkSpace(double p, double H, double alpha,double a, double* outputArray, int
                 complex double dz;
                 D(kx,ky,kz,&dx,&dy,&dz,H,alpha);
                 // printf("dx, dy, dz = %f + %f I, %f + %f I, %f + %f I\n",creal(dx),cimag(dx),creal(dy),cimag(dy),creal(dz),cimag(dz));
-
+                if (dx == 0.0 && dy == 0.0 && dz == 0.0){
+                    fprintf(stderr,"D is 0, i,j,k = %d,%d,%d, kx,ky,kz = %f,%f,%f\n, dx = %f + %f I, dy = %f + %f I, dz = %f + %f I",iLoop,jLoop,kLoop,kx,ky,kz,creal(dx),cimag(dx),creal(dy),cimag(dy),creal(dz),cimag(dx));
+                }
                 if (isnan(creal(dx)) || isnan(cimag(dx)) || isnan(creal(dy)) || isnan(cimag(dy))|| isnan(creal(dz)) || isnan(cimag(dz))){
+                    fprintf(stderr,"dx or dy or dz is nan\n");
                     exit(5);
                 }
 
                 // Work out D(k) squared
                 complex double dkSquared = dx*conj(dx) + dy*conj(dy) + dz*conj(dz);
                 if (isnan(creal(dkSquared)) || isnan(cimag(dkSquared))){
+                    fprintf(stderr, "dkSquared is nan\n");
                     exit(6);
                 }
                 const int index = indexArray(iLoop,jLoop,kLoop,N);
@@ -478,12 +496,18 @@ void GkSpace(double p, double H, double alpha,double a, double* outputArray, int
                 dy *= sumProductY;
                 dz *= sumProductZ;
                 if (isnan(creal(dx)) || isnan(cimag(dx)) || isnan(creal(dy)) || isnan(cimag(dy))|| isnan(creal(dz)) || isnan(cimag(dz))){
+                    fprintf(stderr,"dx, or dy, or dz is nan\n");
                     exit(7);
                 }
 
                 complex double numerator = dx + dy + dz;
                 complex double denominator = dkSquared * sumUSquared;
-                
+                if (dkSquared == 0.0){
+                    fprintf(stderr,"dkSquared is 0\n");
+                } 
+                if (sumUSquared == 0.0){
+                    fprintf(stderr, "sumUsquared is 0");
+                }
                 complex double result = numerator / denominator;
                 outputArray[index] = result;
                 // printf("Result: %f + %f I\n",creal(result),cimag(result));
@@ -556,9 +580,54 @@ void longRangeForces(mesh* inputMesh,double dt){
         for (int jLoop = 0; jLoop < N; jLoop++){
             for (int kLoop = 0; kLoop < N; kLoop++){
                 const int index = indexArray(iLoop,jLoop,kLoop,N);
-                const double fx = (rho_array[iLoop] - rho_array[iLoop - 1]) /H; // - grad phi 
-                const double fy = (rho_array[jLoop] - rho_array[jLoop - 1]) /H; 
-                const double fz = (rho_array[kLoop] - rho_array[kLoop - 1]) /H; 
+                const int iLoopPlus1 = indexArray(iLoop+1,jLoop,kLoop,N);
+                const int iLoopMinus1 = indexArray(iLoop-1,jLoop,kLoop,N);
+                const int jLoopPlus1 = indexArray(iLoop,jLoop+1,kLoop,N);
+                const int jLoopMinus1 = indexArray(iLoop,jLoop-1,kLoop,N);
+                const int kLoopPlus1 = indexArray(iLoop,jLoop,kLoop+1,N);
+                const int kLoopMinus1 = indexArray(iLoop,jLoop,kLoop-1,N);
+                double fx;
+                double fy;
+                double fz;
+
+                if (iLoop == 0){
+                    int iLoopPlus2 = indexArray(iLoop+2,jLoop,kLoop,N);
+                    fx = (rho_array[iLoopPlus2] - rho_array[index]) /(2*H);  
+                }
+                else if (iLoop == N-1){
+                    int iLoopMinus2 = indexArray(iLoop-2,jLoop,kLoop,N);
+                    fx = (rho_array[index] - rho_array[iLoopMinus2]) /(2*H); 
+                }
+                else {
+                    fx = (rho_array[iLoopPlus1] - rho_array[iLoopMinus1]) /(2*H);
+                }
+               
+                if (jLoop == 0){
+                    int jLoopPlus2 = indexArray(iLoop,jLoop+2,kLoop,N);
+                    fy = (rho_array[jLoopPlus2] - rho_array[index]) /(2*H);  
+                }
+                else if (jLoop == N-1){
+                    int jLoopMinus2 = indexArray(iLoop,jLoop-2,kLoop,N);
+                    fy = (rho_array[index] - rho_array[jLoopMinus2]) /(2*H); 
+                }
+                else {
+                    fy = (rho_array[jLoopPlus1] - rho_array[jLoopMinus1]) /(2*H);
+                } 
+                if (kLoop == 0){
+                    int kLoopPlus2 = indexArray(iLoop,kLoop,kLoop+2,N);
+                    fz = (rho_array[kLoopPlus2] - rho_array[index]) /(2*H);  
+                }
+                else if (kLoop == N-1){
+                    int kLoopMinus2 = indexArray(iLoop,jLoop,kLoop-2,N);
+                    fz = (rho_array[index] - rho_array[kLoopMinus2]) /(2*H); 
+                }
+                else {
+                    fz = (rho_array[kLoopPlus1] - rho_array[kLoopMinus1]) /(2*H);
+                } 
+                // const double fx = (rho_array[iLoopPlus1] - rho_array[iLoopMinus1]) /(2*H); // - grad phi 
+                // const double fy = (rho_array[jLoopPlus1] - rho_array[jLoopMinus1]) /(2*H); 
+                // const double fz = (rho_array[kLoopPlus1] - rho_array[kLoopMinus1]) /(2*H); 
+                
                 inputMesh->potentialMeshCells[index].fx = fx;
                 inputMesh->potentialMeshCells[index].fy = fy;
                 inputMesh->potentialMeshCells[index].fz = fz;
@@ -596,7 +665,7 @@ void longRangeForces(mesh* inputMesh,double dt){
                         
                     }
                     obForce = scalar_mul_vec3(1.0/inputMesh->objects[obnum].mass,&obForce); // Work out acceleration
-                    inputMesh->objects[obnum].acc = add_vec3(&obForce,&inputMesh->objects[obnum].acc);
+                    inputMesh->objects[obnum].acc = add_vec3(&obForce,&inputMesh->objects[obnum].acc); // commented out so that only long range forces contribute
                     
                     printf("(fx,fy,fz) = %f,%f,%f | num times called = %d\n",obForce.x,obForce.y,obForce.z,numTimesCalled); 
     
@@ -610,6 +679,7 @@ void longRangeForces(mesh* inputMesh,double dt){
                         printf("Encountered nan value at (%d,%d,%d)\n",iLoop,jLoop,kLoop);
                         continue;
                     }
+                    
                     // printf("Force %d = (%f,%f,%f)\n",index,obForce.x,obForce.y,obForce.z);
                     inputMesh->objects[obnum].vel = newVel;
                     

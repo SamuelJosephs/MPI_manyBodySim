@@ -111,16 +111,21 @@ object* uniform(const int numObjectsPerSideLength,double epsilon, double dt,cons
 			for (int k = 0; k < numObjectsPerSideLength; k++){
 				// Work out position of object
 				vec3 pos;
-				pos.x = (double) i * (universeWidth / (double) numObjectsPerSideLength) + ((double)rand()/RAND_MAX  * 1e-2 * universeWidth );
-				pos.y = (double) j * (universeWidth / (double) numObjectsPerSideLength) + ((double)rand()/RAND_MAX  * 1e-2 * universeWidth );
-				pos.z = (double) k * (universeWidth / (double) numObjectsPerSideLength) + ((double)rand()/RAND_MAX  * 1e-2 * universeWidth );
+				double h = universeWidth / (double) numObjectsPerSideLength;
+				// pos.x = (double) i * (universeWidth / (double) numObjectsPerSideLength) + ((double)rand()/RAND_MAX  * 1e-2 * universeWidth );
+				// pos.y = (double) j * (universeWidth / (double) numObjectsPerSideLength) + ((double)rand()/RAND_MAX  * 1e-2 * universeWidth );
+				// pos.z = (double) k * (universeWidth / (double) numObjectsPerSideLength) + ((double)rand()/RAND_MAX  * 1e-2 * universeWidth );
+				pos.x = ((double) i + 0.5) * h + ((double)rand()/RAND_MAX  * 0.5*h); 
+				pos.y = ((double) j + 0.5) * h + ((double)rand()/RAND_MAX  * 0.5*h); 
+				pos.z = ((double) k + 0.5) * h + ((double)rand()/RAND_MAX  * 0.5*h); 
+
 				object ob;
 				ob.pos = pos;
-				ob.vel = zeroVec;
-				ob.acc = zeroVec;
+				ob.vel = vec3From(0.0,0.0,0.0);
+				ob.acc = vec3From(0.0,0.0,0.0);
 				ob.next = -1;
 				ob.nextPotentialMesh = -1;
-				ob.mass = 1e4;
+				ob.mass = 1e0;
 				ob.KE = 0.0;
 				ob.GPE = 0.0;
 				int index = (numObjectsPerSideLength*numObjectsPerSideLength*i + numObjectsPerSideLength*j + k );
