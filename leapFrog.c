@@ -129,7 +129,6 @@ void writeOutputArrayToFile(const object* const restrict outputArray, FILE* file
 
 void writeOutpuDensityProfileToFile(mesh* inputMesh,FILE* file){
     double a = inputMesh->potentialCellWidth;
-    double vol = a*a*a;
     for (int iLoop = 0; iLoop < inputMesh->numPotentialMeshCells; iLoop++){
        
 
@@ -143,17 +142,46 @@ void writeOutpuDensityProfileToFile(mesh* inputMesh,FILE* file){
         }
 
         // containedMass /= vol;
-        if (containedMass > 0.0){
-            printf("Contained mass at %d\n",iLoop);
-        }
+
         fprintf(file, "%f,%f,%f,%f,",
             containedMass,
             inputMesh->potentialMeshCells[iLoop].pos.x,
             inputMesh->potentialMeshCells[iLoop].pos.y,
             inputMesh->potentialMeshCells[iLoop].pos.z
         );
-        fputc('\n',file);
     }
+    fprintf(file,"0.0\n");
+}
+
+void writeObjectsToFile(FILE* file, mesh* inputMesh){
+    double px = 0.0;
+    double py = 0.0;
+    double pz = 0.0;
+    object* objects = inputMesh->objects;
+    int N = inputMesh->numObjects;
+    for (int i = 0; i < N; i++){
+
+        px += objects[i].mass * objects[i].vel.x;
+        py += objects[i].mass * objects[i].vel.y;
+        pz += objects[i].mass * objects[i].vel.z;
+        const double pxTemp =  objects[i].mass * objects[i].vel.x;
+        const double pyTemp =  objects[i].mass * objects[i].vel.y;
+        const double pzTemp =  objects[i].mass * objects[i].vel.z;
+
+        fprintf(file,"%f,%f,%f,%f,%f,%f,",
+        objects[i].pos.x,
+        objects[i].pos.y,
+        objects[i].pos.z,
+        pxTemp,
+        pyTemp,
+        pzTemp
+        );
+
+    }
+    fprintf(file,"%f,%f,%f\n",px,py,pz);
 }
 
 
+void writeRhoArrayToFile(mesh* inputMesh, FILE* file){
+   inputMesh->numPotentialMeshCellsPerSideLength; 
+}

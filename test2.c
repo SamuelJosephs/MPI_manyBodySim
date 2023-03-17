@@ -9,6 +9,7 @@ const int numObjects = numObjectsPerSideLength * numObjectsPerSideLength * numOb
 double g = 6.67e-11;
 int main(int argc, char** argv){
     FILE* output = fopen("Test2_data.csv","w+");
+    FILE* outputDensity = fopen("Test2_dataDensity.csv","w+");
 
     int nsteps;
     // getnsteps
@@ -35,7 +36,7 @@ int main(int argc, char** argv){
     }
     writeObjectsToFile(output,&test);
     for (int i = 0; i < nsteps; i++){
-        periodicBox(&test,0.001*test.potentialCellWidth);
+        periodicBox(&test,1e-6*test.potentialCellWidth);
         assignObjectsToMesh(objects,&test);
         // printAllPotentialMeshCellObjects(&test);
         assignCharge(&test);
@@ -43,11 +44,12 @@ int main(int argc, char** argv){
         longRangeForces(&test,dt);
         if (counter == 2){
             writeObjectsToFile(output,&test);
+            writeOutpuDensityProfileToFile(&test,outputDensity);
             counter =  0;
             continue;
         }
         counter++;
-        periodicBox(&test,0.001*test.potentialCellWidth);
+        periodicBox(&test,1e-6*test.potentialCellWidth);
     }
     printf("Succsess!");
 }

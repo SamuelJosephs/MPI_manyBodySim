@@ -409,6 +409,10 @@ void RkSpace(double kx, double ky, double kz, double a,fftw_complex* Rx, fftw_co
     return;
 }
 
+double P(double k,mesh* inputMesh){
+
+}
+
 void GkSpace(double p, double H, double alpha,double a, double* outputArray, int outputArrayLength,mesh* inputMesh ){
     printf("Computing G(k)\n");
     // Compute D(k)
@@ -592,37 +596,37 @@ void longRangeForces(mesh* inputMesh,double dt){
 
                 if (iLoop == 0){
                     int iLoopPlus2 = indexArray(iLoop+2,jLoop,kLoop,N);
-                    fx = (rho_array[iLoopPlus2] - rho_array[index]) /(2*H);  
+                    fx = -1.0*(rho_array[iLoopPlus2] - rho_array[index]) /(2*H);  
                 }
                 else if (iLoop == N-1){
                     int iLoopMinus2 = indexArray(iLoop-2,jLoop,kLoop,N);
-                    fx = (rho_array[index] - rho_array[iLoopMinus2]) /(2*H); 
+                    fx = -1.0*(rho_array[index] - rho_array[iLoopMinus2]) /(2*H); 
                 }
                 else {
-                    fx = (rho_array[iLoopPlus1] - rho_array[iLoopMinus1]) /(2*H);
+                    fx = -1.0*(rho_array[iLoopPlus1] - rho_array[iLoopMinus1]) /(2*H);
                 }
                
                 if (jLoop == 0){
                     int jLoopPlus2 = indexArray(iLoop,jLoop+2,kLoop,N);
-                    fy = (rho_array[jLoopPlus2] - rho_array[index]) /(2*H);  
+                    fy = -1.0*(rho_array[jLoopPlus2] - rho_array[index]) /(2*H);  
                 }
                 else if (jLoop == N-1){
                     int jLoopMinus2 = indexArray(iLoop,jLoop-2,kLoop,N);
-                    fy = (rho_array[index] - rho_array[jLoopMinus2]) /(2*H); 
+                    fy = -1.0*(rho_array[index] - rho_array[jLoopMinus2]) /(2*H); 
                 }
                 else {
-                    fy = (rho_array[jLoopPlus1] - rho_array[jLoopMinus1]) /(2*H);
+                    fy = -1.0*(rho_array[jLoopPlus1] - rho_array[jLoopMinus1]) /(2*H);
                 } 
                 if (kLoop == 0){
                     int kLoopPlus2 = indexArray(iLoop,kLoop,kLoop+2,N);
-                    fz = (rho_array[kLoopPlus2] - rho_array[index]) /(2*H);  
+                    fz = -1.0*(rho_array[kLoopPlus2] - rho_array[index]) /(2*H);  
                 }
                 else if (kLoop == N-1){
                     int kLoopMinus2 = indexArray(iLoop,jLoop,kLoop-2,N);
-                    fz = (rho_array[index] - rho_array[kLoopMinus2]) /(2*H); 
+                    fz = -1.0*(rho_array[index] - rho_array[kLoopMinus2]) /(2*H); 
                 }
                 else {
-                    fz = (rho_array[kLoopPlus1] - rho_array[kLoopMinus1]) /(2*H);
+                    fz = -1.0*(rho_array[kLoopPlus1] - rho_array[kLoopMinus1]) /(2*H);
                 } 
                 // const double fx = (rho_array[iLoopPlus1] - rho_array[iLoopMinus1]) /(2*H); // - grad phi 
                 // const double fy = (rho_array[jLoopPlus1] - rho_array[jLoopMinus1]) /(2*H); 
