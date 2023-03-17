@@ -44,15 +44,23 @@ plt.show()
 
 fig = plt.figure(1)
 ax = plt.axes(projection = '3d')
-for n in range(len(xPositions)):
+# for n in range(len(xPositions)):
 
-    ax.plot3D(xPositions[n],yPositions[n],zPositions[n])
-    # ax.plot3D(xPositions[1],yPositions[1],zPositions[1])
-    # ax.plot3D(xPositions[2],yPositions[2],zPositions[2])
+#     ax.plot3D(xPositions[n],yPositions[n],zPositions[n])
+#     # ax.plot3D(xPositions[1],yPositions[1],zPositions[1])
+#     # ax.plot3D(xPositions[2],yPositions[2],zPositions[2])
+ax.scatter(xPositions[-1],yPositions[-1],zPositions[-1])
 a = 10
-ax.set_xlim(-a*radJupiter,a*radJupiter)
-ax.set_ylim(-a*radJupiter,a*radJupiter)
-ax.set_zlim(-a*radJupiter,a*radJupiter)
+# ax.set_xlim(-a*radJupiter,a*radJupiter)
+# ax.set_ylim(-a*radJupiter,a*radJupiter)
+# ax.set_zlim(-a*radJupiter,a*radJupiter)
+
+# ax.set_xticks(np.arange(0,a*radJupiter,a*radJupiter/20))
+# ax.set_yticks(np.arange(0,a*radJupiter,a*radJupiter/20))
+# ax.set_zticks(np.arange(0,a*radJupiter,a*radJupiter/20))
 plt.show()
 
-print(xPositions[1])
+for i in range(len(xPositions)):
+    for j in range(len(xPositions[0])):
+
+        print(f"{xPositions[i][j]}, {yPositions[i][j]}, {zPositions[i][j]}")

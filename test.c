@@ -2,16 +2,24 @@
 #include "mesh.c"
 #include "systems.c"
 const static double epsilon = 1e3; 
-const static double dt = 1e-2;
-const double universeWidth = 20.0 * 778e9;
+const static double dt = 1e-9;
+const double universeWidth = 200.0 * 778e9;
 
 
-int main(){
-    int numObjectsPerSideLength = 3;
+int main(int argc, char** argv){
+    int nsteps;
+    // getnsteps
+    char* ptr;
+    if (argc == 2){
+        nsteps = strtol(argv[1],&ptr,10);
+    } else {
+        nsteps = 150;
+    }
+    int numObjectsPerSideLength = 5;
     int numObjects = numObjectsPerSideLength * numObjectsPerSideLength * numObjectsPerSideLength;
     object* distribution = uniform(numObjectsPerSideLength,epsilon,dt,universeWidth);
     leapFrogSetup(distribution,numObjects,epsilon,dt);
-    mesh domainMesh = meshFrom(universeWidth/5,universeWidth,10,distribution,numObjects,epsilon);
+    mesh domainMesh = meshFrom(universeWidth/5,universeWidth,50,distribution,numObjects,epsilon);
     FILE* outputFile = fopen("Test_Data.csv","w+");
     printf("Num mesh cells per side length from main = %d\n",domainMesh.numMeshCellsPerSideLength);
     int counter = 0;
@@ -26,16 +34,17 @@ int main(){
     }
     
 
-    for (int i = 0; i < 100; i++){
+    for (int i = 0; i < nsteps; i++){
         meshCellLeapFrogStep(&domainMesh,dt);
 
 
-        if (counter == 10){
+        // if (counter == 10){
             printf("numobjects: %d\n",numObjects);
-            writeOutpuDensityProfileToFile(&domainMesh,outputFile);
+            // writeOutpuDensityProfileToFile(&domainMesh,outputFile);
+            writeObjectsToFile(outputFile,&domainMesh);
             counter = 0;
             domainMesh.numIterationsPast++;
-        }
+        // }
         counter++;
         
     }

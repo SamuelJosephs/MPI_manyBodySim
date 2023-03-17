@@ -308,7 +308,8 @@ mesh meshFrom(const double meshCellWidth, const double universeWidth, int numPot
 vec3 accelerationBetweenObjects(mesh* inputMesh, int A, int B){
     const double g = 6.67e-11;
     const double epsilon = inputMesh->epsilon;
-    vec3 outputAcc = inputMesh->objects[A].acc;
+    // vec3 outputAcc = inputMesh->objects[A].acc;
+    vec3 outputAcc = vec3From(0.0,0.0,0.0);
     const vec3 iPos = inputMesh->objects[A].pos;
    
 
@@ -319,7 +320,8 @@ vec3 accelerationBetweenObjects(mesh* inputMesh, int A, int B){
     const double acc_mul = (g * jMass) / sqrt(pow(vec3_mag_squared(seperation) + epsilon*epsilon,3.0));
     const vec3 acc_mul_sep = scalar_mul_vec3(acc_mul,&seperation);
     outputAcc = add_vec3(&outputAcc,&acc_mul_sep);
-    return outputAcc;
+    // return outputAcc;
+    return acc_mul_sep;
 }
 
 void getNeighbhors(int* inputArray, const int i, const int j, const int k, mesh* inputMesh){
@@ -367,22 +369,24 @@ void accelerationFromCell(mesh* inputMesh,const unsigned int i, const unsigned i
     meshCell* cell = indexMesh(inputMesh,i,j,k);
     int neighbhors[27]; // max neighbhors = 27 = 3**3 
     getNeighbhors(neighbhors,i,j,k,inputMesh);  
-    const double a = inputMesh->potentialCellWidth;
+    const double a = 0.7*inputMesh->potentialCellWidth;
     const double aSquared = a*a;
     // Loop through every i'th object in cell
     for (int i = cell->head; i != -1; i = inputMesh->objects[i].next){
         vec3 accel = vec3From(0.0,0.0,0.0);
         vec3 posi = inputMesh->objects[i].pos;
         for (int j = 0; j < 27; j++){
-            vec3 posj = inputMesh->objects[j].pos;
-            vec3 seperation = sub_vec3(&posj,&posi);
-            double distance_squared = vec3_mag_squared(seperation);
-            if (neighbhors[j] == -1 || (distance_squared > 0.7*0.7*aSquared)){
+            if (neighbhors[j] == -1){
                 continue;
-            }
+            }           
             // Calculate forces between i'th object and every neighbhoring cell
             for (int k = neighbhors[j]; k != -1; k = inputMesh->objects[k].next){
- 
+                vec3 posj = inputMesh->objects[k].pos;
+                vec3 sep = sub_vec3(&posj,&posi);
+                double magSquared = vec3_mag_squared(sep);
+                if (magSquared > aSquared){
+                    continue;
+                }
                 vec3 temp = accelerationBetweenObjects(inputMesh,i,k);
                 accel = add_vec3(&accel,&temp);
                 if (inputMesh->objects[k].next == -1){
@@ -542,32 +546,38 @@ void periodicBoxBoundary(int obNum, mesh* inputMesh){
     if (pos.x < 0.0 || (isnan(pos.x) && signbit(pos.x))){
         pos.x = width;
         vel.x = -1 * abs(vel.x);
+        // vel.x = 0.0;
     }
 
    if (pos.x > width || isnan(pos.x)){
         pos.x = 0.0;
         vel.x =  abs(vel.x);
+        // vel.x = 0.0;
         
     }
 
     if (pos.y < 0.0 || (isnan(pos.y) && signbit(pos.y))){
         pos.y = width;
         vel.y = -1 * abs(vel.y);
+        // vel.y = 0.0;
     }
 
    if (pos.y > width || isnan(pos.y)){
         pos.y = 0;
         vel.y =  abs(vel.y);
+        // vel.y = 0.0;
     }
 
     if (pos.z < 0.0 || (isnan(pos.x) && signbit(pos.x))){
         pos.z = width;
         vel.z = -1 * abs(vel.z);
+        // vel.z = 0.0;
     }
 
    if (pos.z > width || isnan(pos.x)){
         pos.z = 0.0;
         vel.z = abs(vel.z);
+        // vel.z = 0.0;
     }
 
     inputMesh->objects[obNum].pos = pos;
@@ -589,14 +599,15 @@ void GreenKSpace(mesh* inputMesh){
                 // Compute there x, y , and z positions
 
 
-                vec3 pos = indexPotentialMesh(inputMesh,i,j,k)->pos;
-                vec3 k;
+                vec3 kvec;
             
-                k.x = 2.0*M_PI/pos.x;
-                k.y = 2.0*M_PI/pos.y;
-                k.z = 2.0*M_PI/pos.z;
-                double mag = vec3_mag_squared(k);
+                kvec.x = 2.0*M_PI/inputMesh->numPotentialMeshCellsPerSideLength * i;
+                kvec.y = 2.0*M_PI/inputMesh->numPotentialMeshCellsPerSideLength * j;
+                kvec.z = 2.0*M_PI/inputMesh->numPotentialMeshCellsPerSideLength * k;
+                double mag = vec3_mag_squared(kvec);
+                if (mag != 0.0){
                 *rho_i/=mag;
+                }
                 *rho_i /= (2*M_PI); // normalisation constant from fourier transform
 
 
@@ -617,15 +628,17 @@ void longRangeForces(mesh* inputMesh){
         // printPotentialMeshCellObjects(&potentialMeshCells[i],inputMesh);
         for (int j = potentialMeshCells[i].head; j != -1; j = objects[j].nextPotentialMesh){
             totalMassInCell += objects[j].mass;
-            if (objects[j].nextPotentialMesh == -1){
-                break;
-            } 
+
         }
         totalMassInCell /= potentialMeshCells[i].volume; // Calculate the mass density
         // Write to rho_array
         int iCoord = objects[potentialMeshCells[i].head].iPotential;
         int jCoord = objects[potentialMeshCells[i].head].jPotential;
         int kCoord = objects[potentialMeshCells[i].head].kPotential;
+        // int iCoord;
+        // int jCoord;
+        // int kCoord;
+        
 
         fftw_complex* ijkthDensity = indexRhoArray(inputMesh,iCoord,jCoord,kCoord); 
         *ijkthDensity = totalMassInCell + 0*I;
@@ -646,12 +659,11 @@ void longRangeForces(mesh* inputMesh){
                 // Compute there x, y , and z positions
 
 
-                vec3 pos = indexPotentialMesh(inputMesh,i,j,k)->pos;
                 vec3 ktemp;
             
-                ktemp.x = 2.0*M_PI/pos.x;
-                ktemp.y = 2.0*M_PI/pos.y;
-                ktemp.z = 2.0*M_PI/pos.z;
+                ktemp.x = 2.0*M_PI/inputMesh->numPotentialMeshCellsPerSideLength * i;
+                ktemp.y = 2.0*M_PI/inputMesh->numPotentialMeshCellsPerSideLength * j;
+                ktemp.z = 2.0*M_PI/inputMesh->numPotentialMeshCellsPerSideLength * k;
                 const double magSquared = vec3_mag_squared(ktemp);
                 const double mag = sqrt(magSquared); 
                 fftw_complex ikx;
@@ -666,9 +678,9 @@ void longRangeForces(mesh* inputMesh){
                 // TODO: fill ikxArray, ikyArray, and ikzArray  with ik*G*rho
                 const double g = 6.67e-11;
                 const double constant = 4.0*M_PI*g; 
-                inputMesh->kxArray[index] = ikx * *rho_i * constant; 
-                inputMesh->kxArray[index] = iky * *rho_i * constant;
-                inputMesh->kyArray[index] = ikz * *rho_i * constant;
+                inputMesh->kxArray[index] = ikx * (*rho_i) * constant; 
+                inputMesh->kxArray[index] = iky * (*rho_i) * constant;
+                inputMesh->kyArray[index] = ikz * (*rho_i) * constant;
 
 
             }
@@ -686,6 +698,7 @@ void longRangeForces(mesh* inputMesh){
                 meshCell* potentialCell = &inputMesh->potentialMeshCells[index];
                 // Calculate field strength at given point
                 vec3 E;
+                
                 E.x = creal(inputMesh->kxArray[index]);
                 E.y = creal(inputMesh->kyArray[index]);
                 E.z = creal(inputMesh->kzArray[index]);
@@ -695,9 +708,7 @@ void longRangeForces(mesh* inputMesh){
                     object* ob = &inputMesh->objects[l];
                     // E is the acceleration, as F = mE = ma -> a = E
                     ob->acc = add_vec3(&ob->acc,&E);
-                    if (inputMesh->objects[l].nextPotentialMesh == -1){
-                        break;
-                    } 
+              
                 }
             }
         }
@@ -705,11 +716,11 @@ void longRangeForces(mesh* inputMesh){
 }
 
 void meshCellLeapFrogStep(mesh* inputMesh, double dt){
-    // shortRangeForces(inputMesh);
+    shortRangeForces(inputMesh);
     static int numLongForcesComputes = 0;
     fprintf(stderr,"Comptuing long range forces for the %d'th time\n",numLongForcesComputes);
     numLongForcesComputes++;
-    // longRangeForces(inputMesh);
+    longRangeForces(inputMesh);
     for (int i = 0; i < inputMesh->numObjects; i++){
         vec3 temp = scalar_mul_vec3(dt,&inputMesh->objects[i].acc);
         inputMesh->objects[i].vel = add_vec3(&inputMesh->objects[i].vel,&temp);
